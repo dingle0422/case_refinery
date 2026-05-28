@@ -59,8 +59,8 @@ class FakeLanceClient:
 def _settings_for_tests() -> None:
     set_settings(Settings(
         upstream_base_url="http://stub",
+        upstream_list_all_path="/stub-all",
         upstream_list_path="/stub",
-        upstream_kh_field="khCode",
         lancedb_base_url="http://stub-lance",
         lancedb_api_key="",
         kh_codes=["KH_TEST"],
@@ -96,6 +96,14 @@ def _patch_fetch_cases(monkeypatch: pytest.MonkeyPatch, cases: list[dict] | None
             raise raise_exc
         return cases or []
     monkeypatch.setattr(runner, "fetch_cases", _fake)
+
+
+def _patch_fetch_all_kh_codes(
+    monkeypatch: pytest.MonkeyPatch, kh_codes: list[str] | None
+) -> None:
+    async def _fake(**kwargs):  # noqa: ARG001
+        return kh_codes or []
+    monkeypatch.setattr(runner, "fetch_all_kh_codes", _fake)
 
 
 def _patch_refine(
@@ -331,3 +339,44 @@ async def test_same_question_revision_tombstones_old_version(
     assert summary.tombstoned == 1
     assert len(cli.tombstoned) == 1
     assert cli.tombstoned[0].doc_id == "doc-old"
+
+
+@pytest.mark.asyncio
+async def test_run_all_uses_list_all_kh(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_fetch_all_kh_codes(monkeypatch, ["KH_A", "KH_B"])
+
+    async def _fake_run_once(kh_code: str, **kwargs):  # noqa: ARG001
+        return runner.RunSummary(
+            kh_code=kh_code,
+            started_at_ms=1,
+            finished_at_ms=2,
+            upstream_fetched=0,
+        )
+
+    monkeypatch.setattr(runner, "run_once", _fake_run_once)
+
+    class DummyCli:
+        def __init__(self, settings):  # noqa: ARG002
+            pass
+
+        async def aclose(self) -> None:
+            return
+
+    monkeypatch.setattr(runner, "LanceDBV2Client", DummyCli)
+
+    summaries = await runner.run_all()
+    assert [s.kh_code for s in summaries] == ["KH_A", "KH_B"]
+
+
+@pytest.mark.asyncio
+async def test_run_all_when_list_all_fails_returns_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from case_refinery.pipeline.upstream import UpstreamError
+
+    async def _fake(**kwargs):  # noqa: ARG001
+        raise UpstreamError("boom")
+
+    monkeypatch.setattr(runner, "fetch_all_kh_codes", _fake)
+    summaries = await runner.run_all()
+    assert summaries == []

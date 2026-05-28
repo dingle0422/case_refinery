@@ -1,6 +1,6 @@
 # Case Refinery Service
 
-独立离线服务：按 `khCode` 周期性拉取线上 case 回流数据，按正/负样本做 LLM 提炼，写入 LanceDB v2 collection `case_{khCode}`，供主推理服务 `page-know-how` 在线检索增强。
+独立离线服务：周期性先从上游拉取全部 `khCode`，再按 `khCode` 拉取 case 回流数据，按正/负样本做 LLM 提炼，写入 LanceDB v2 collection `case_{khCode}`，供主推理服务 `page-know-how` 在线检索增强。
 
 ## 与主仓的关系
 
@@ -12,6 +12,7 @@
 
 ```
 APScheduler tick (per khCode)
+  -> upstream.fetch_all_kh_codes()
   -> upstream.fetch_cases(khCode)
   -> lancedb_client.list_existing(khCode)
   -> classifier (polarity + record_hash + question_hash)
@@ -65,7 +66,7 @@ curl -X POST http://127.0.0.1:8090/trigger
 |---|---|---|
 | `GET` | `/healthz` | 存活探针 |
 | `GET` | `/status` | 调度配置 + 上轮 `RunSummary` 快照 |
-| `POST` | `/trigger` | 同步触发全部 `CASE_REFINERY_KH_CODES`，返回 summary 列表 |
+| `POST` | `/trigger` | 同步触发：先拉 `listAllKh` 再逐个处理，返回 summary 列表 |
 | `POST` | `/trigger/{kh_code}` | 同步触发单个 khCode |
 
 ## 配置（环境变量）
@@ -73,11 +74,11 @@ curl -X POST http://127.0.0.1:8090/trigger
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `CASE_REFINERY_UPSTREAM_BASE_URL` | `http://10.199.0.40:8080/kg-platform` | 上游 case 接口 base |
-| `CASE_REFINERY_UPSTREAM_LIST_PATH` | `/api/kh/listCorpusByPolicyId` | list 接口路径 |
-| `CASE_REFINERY_UPSTREAM_KH_FIELD` | `auto` | 入参策略：`auto` 先 khCode 前缀再 policyId；或强制 `khCode` / `policyId` |
+| `CASE_REFINERY_UPSTREAM_LIST_ALL_PATH` | `/api/kh/listAllKh` | 全量 khCode 接口路径 |
+| `CASE_REFINERY_UPSTREAM_LIST_PATH` | `/api/kh/listCorpusByKhCode` | case 列表接口路径（入参 `khCode`） |
 | `CASE_REFINERY_LANCEDB_BASE_URL` | `http://mlp.paas.dc.servyou-it.com/kh-lancedb` | LanceDB v2 base |
 | `CASE_REFINERY_LANCEDB_API_KEY` | `` | LanceDB API key（空表示无鉴权）|
-| `CASE_REFINERY_KH_CODES` | `` | 逗号分隔的 policyId 列表（khCode 为其前缀） |
+| `CASE_REFINERY_KH_CODES` | `` | 可选保留项（当前全量调度不依赖） |
 | `CASE_REFINERY_SCHEDULE_CRON_HOUR` | `0` | 每日固定触发小时（默认 0 点） |
 | `CASE_REFINERY_SCHEDULE_CRON_MINUTE` | `0` | 每日固定触发分钟（默认 00 分） |
 | `CASE_REFINERY_SCHEDULE_INTERVAL_HOURS` | `0` | 调试覆盖：按小时间隔触发；>0 时覆盖 cron |

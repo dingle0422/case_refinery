@@ -28,7 +28,7 @@ from typing import Any
 from ..config import Settings, get_settings
 from . import classifier, dedupe, refiner
 from .lancedb_client import ExistingDoc, ExistingIndex, LanceDBError, LanceDBV2Client
-from .upstream import CaseDict, UpstreamError, fetch_cases
+from .upstream import CaseDict, UpstreamError, fetch_all_kh_codes, fetch_cases
 
 logger = logging.getLogger(__name__)
 
@@ -376,16 +376,22 @@ async def run_all(
     *,
     settings: Settings | None = None,
 ) -> list[RunSummary]:
-    """遍历 ``settings.kh_codes``。"""
+    """先拉 ``listAllKh``，再遍历所有 khCode。"""
     s = settings or get_settings()
-    if not s.kh_codes:
-        logger.info("[runner] settings.kh_codes 为空，无任何 khCode 可调度")
+    try:
+        kh_codes = await fetch_all_kh_codes(settings=s)
+    except UpstreamError as e:
+        logger.warning("[runner] 拉取 khCode 列表失败，整轮 abort: %s", e)
+        return []
+
+    if not kh_codes:
+        logger.info("[runner] listAllKh 返回空，无任何 khCode 可调度")
         return []
 
     cli = LanceDBV2Client(settings=s)
     summaries: list[RunSummary] = []
     try:
-        for kh in s.kh_codes:
+        for kh in kh_codes:
             summaries.append(
                 await run_once(kh, settings=s, lancedb_client=cli)
             )

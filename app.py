@@ -19,10 +19,12 @@ lifespan 负责：
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from dataclasses import replace
 
 from fastapi import FastAPI
 
@@ -36,7 +38,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ""):
     __package__ = _package_name
 
 from .api.routes import router as api_router
-from .config import get_settings
+from .config import Settings, get_settings, set_settings
 from .pipeline.lancedb_client import LanceDBError, LanceDBV2Client
 from .scheduler import build_scheduler, mark_scheduler_started
 
@@ -92,9 +94,36 @@ app = FastAPI(title="case_refinery", version="0.1.0", lifespan=lifespan)
 app.include_router(api_router)
 
 
-def main() -> None:
+def _apply_cli_overrides(argv: list[str]) -> None:
+    """解析并应用 CLI 覆盖项。"""
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument(
+        "--schedule_interval_seconds",
+        type=int,
+        default=None,
+        help="覆盖 CASE_REFINERY_SCHEDULE_INTERVAL_SECONDS",
+    )
+    args, _ = parser.parse_known_args(argv)
+    if args.schedule_interval_seconds is not None:
+        if args.schedule_interval_seconds < 0:
+            parser.error("--schedule_interval_seconds 不能小于 0")
+        os.environ["CASE_REFINERY_SCHEDULE_INTERVAL_SECONDS"] = str(
+            args.schedule_interval_seconds
+        )
+        # Settings 的环境默认值在模块导入时就确定，这里用 replace 覆盖单例。
+        set_settings(
+            replace(
+                get_settings(),
+                schedule_interval_seconds=args.schedule_interval_seconds,
+            )
+        )
+
+
+def main(argv: list[str] | None = None) -> None:
     """支持直接运行 `python app.py` 启动服务。"""
     import uvicorn
+
+    _apply_cli_overrides(argv or sys.argv[1:])
 
     host = os.getenv("CASE_REFINERY_HOST", "0.0.0.0")
     port = int(os.getenv("CASE_REFINERY_PORT", "5000"))

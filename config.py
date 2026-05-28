@@ -55,16 +55,13 @@ class Settings:
         "CASE_REFINERY_UPSTREAM_BASE_URL",
         "http://10.199.0.40:8080/kg-platform",
     )
+    upstream_list_all_path: str = _env_str(
+        "CASE_REFINERY_UPSTREAM_LIST_ALL_PATH",
+        "/api/kh/listAllKh",
+    )
     upstream_list_path: str = _env_str(
         "CASE_REFINERY_UPSTREAM_LIST_PATH",
-        "/api/kh/listCorpusByPolicyId",
-    )
-    # 上游 list 接口入参策略：
-    # - ``auto``（默认）：先 ``khCode``（policyId 前缀），失败再 ``policyId``（完整 id）
-    # - ``khCode`` / ``policyId``：强制只用单一字段（调试或上游已完全切换时用）
-    upstream_kh_field: str = _env_str(
-        "CASE_REFINERY_UPSTREAM_KH_FIELD",
-        "auto",
+        "/api/kh/listCorpusByKhCode",
     )
     upstream_timeout_s: float = _env_float(
         "CASE_REFINERY_UPSTREAM_TIMEOUT_S", 20.0
@@ -133,19 +130,6 @@ class Settings:
 
     def collection_id(self, kh_code: str) -> str:
         return f"{self.lancedb_collection_prefix}{kh_code}"
-
-    @staticmethod
-    def kh_code_prefix(identifier: str) -> str:
-        """从 policyId 派生 khCode：取首个 ``_`` 之前的前缀。
-
-        ``CASE_REFINERY_KH_CODES`` 里通常放完整 policyId（如
-        ``KH1493204307733168128_20260519101916``），其 khCode 前缀为
-        ``KH1493204307733168128``。若无 ``_`` 则原样返回（已是 khCode 短 id）。
-        """
-        if "_" in identifier:
-            return identifier.split("_", 1)[0]
-        return identifier
-
 
 _settings: Settings | None = None
 

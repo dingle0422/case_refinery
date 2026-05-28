@@ -44,8 +44,8 @@ async def status() -> dict:
             "schedule_cron_minute": s.schedule_cron_minute,
             "schedule_interval_label": s.schedule_interval_label(),
             "upstream_base_url": s.upstream_base_url,
+            "upstream_list_all_path": s.upstream_list_all_path,
             "upstream_list_path": s.upstream_list_path,
-            "upstream_kh_field": s.upstream_kh_field,
             "lancedb_base_url": s.lancedb_base_url,
             "lancedb_collection_prefix": s.lancedb_collection_prefix,
             "llm_vendor": s.llm_vendor,
@@ -58,12 +58,6 @@ async def status() -> dict:
 
 @router.post("/trigger")
 async def trigger_all_route() -> dict:
-    s = get_settings()
-    if not s.kh_codes:
-        raise HTTPException(
-            status_code=400,
-            detail="CASE_REFINERY_KH_CODES 未配置，无可触发的 khCode",
-        )
     summaries = await trigger_all()
     return {"summaries": [x.as_dict() for x in summaries]}
 

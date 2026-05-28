@@ -43,16 +43,12 @@ _RUN_LOCK = asyncio.Lock()
 
 async def _scheduled_tick() -> None:
     """APScheduler 触发的作业入口；遍历所有 khCode。"""
-    s = get_settings()
-    if not s.kh_codes:
-        logger.warning("[scheduler] kh_codes 为空，本轮 tick 跳过")
-        return
-
     async with _RUN_LOCK:
+        s = get_settings()
         import time
         _SCHEDULER_STATE["last_run_started_ms"] = int(time.time() * 1000)
         logger.info(
-            "[scheduler] tick start: kh_codes=%s", s.kh_codes
+            "[scheduler] tick start"
         )
         summaries = await run_all(settings=s)
         for summary in summaries:
