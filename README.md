@@ -1,0 +1,119 @@
+# Case Refinery Service
+
+独立离线服务：按 `khCode` 周期性拉取线上 case 回流数据，按正/负样本做 LLM 提炼，写入 LanceDB v2 collection `case_{khCode}`，供主推理服务 `page-know-how` 在线检索增强。
+
+## 与主仓的关系
+
+- 本服务与主仓 `page-know-how` **完全解耦**，独立进程/容器部署。
+- 本服务不 import 主仓任何业务模块；需要复用的通用工具（LLM 客户端、retry 装饰器）以 **复制 + 精简** 方式放在 `vendor/`。
+- 主仓的 `app.py` / `inference/` 后续会通过 LanceDB v2 `search` 读 `case_{khCode}` collection，不会反向调用本服务。
+
+## 数据流
+
+```
+APScheduler tick (per khCode)
+  -> upstream.fetch_cases(khCode)
+  -> lancedb_client.list_existing(khCode)
+  -> classifier (polarity + record_hash + question_hash)
+  -> dedupe.decide() ── need_refine 子集 ──> refiner (LLM)
+                    └─── skip / bump_attempts ─┐
+                                               v
+                                       lancedb_writer.apply
+                                               |
+                                               v
+                                         LanceDB v2 collection
+```
+
+关键设计：
+- LLM refine 仅对 dedupe 后真正需要写入或覆盖的子集触发，避免无效 token 消耗。
+- `vector` 留空，由 LanceDB v2 服务端基于 `content`（= `questionContent`）自动 embed。
+- 同 `question_hash` 不同 `record_hash` 的旧版本：通过 tombstone 标记（`md_tombstoned_*`）软删，主仓召回时通过 `where` 过滤掉。
+- 失踪 case（库内存在但本轮上游未返回）保留不删；上游报错/空返回整轮 abort，不污染库存。
+
+## 去重 / 覆盖决策表
+
+| 库内同 `record_hash` | 已存 `refine_status` | 本轮 refine | 动作 |
+|---|---|---|---|
+| 否 | — | 成功 | append (refined) + tombstone 同 question 旧版 |
+| 否 | — | 失败 | append (raw_fallback) + tombstone 同 question 旧版 |
+| 是 | refined | — | skip |
+| 是 | raw_fallback | 成功 | merge_by_chunk_id 升级为 refined（doc_id 复用）|
+| 是 | raw_fallback | 失败 | refine_attempts += 1（达到 `refine_max_attempts` 后停止重试）|
+
+## 本地启动
+
+```bash
+# 从仓库根目录
+pip install -r case_refinery/requirements.txt
+uvicorn case_refinery.app:app --host 0.0.0.0 --port 8090 --reload
+```
+
+启动后：
+
+```bash
+curl http://127.0.0.1:8090/healthz
+curl http://127.0.0.1:8090/status
+# 触发单个 khCode
+curl -X POST http://127.0.0.1:8090/trigger/KH1493204307733168128_20260519101916
+# 触发全部已配置 khCode
+curl -X POST http://127.0.0.1:8090/trigger
+```
+
+## HTTP 接口一览
+
+| Method | Path | 说明 |
+|---|---|---|
+| `GET` | `/healthz` | 存活探针 |
+| `GET` | `/status` | 调度配置 + 上轮 `RunSummary` 快照 |
+| `POST` | `/trigger` | 同步触发全部 `CASE_REFINERY_KH_CODES`，返回 summary 列表 |
+| `POST` | `/trigger/{kh_code}` | 同步触发单个 khCode |
+
+## 配置（环境变量）
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `CASE_REFINERY_UPSTREAM_BASE_URL` | `http://10.199.0.40:8080/kg-platform` | 上游 case 接口 base |
+| `CASE_REFINERY_UPSTREAM_LIST_PATH` | `/api/kh/listCorpusByPolicyId` | list 接口路径 |
+| `CASE_REFINERY_UPSTREAM_KH_FIELD` | `auto` | 入参策略：`auto` 先 khCode 前缀再 policyId；或强制 `khCode` / `policyId` |
+| `CASE_REFINERY_LANCEDB_BASE_URL` | `http://mlp.paas.dc.servyou-it.com/kh-lancedb` | LanceDB v2 base |
+| `CASE_REFINERY_LANCEDB_API_KEY` | `` | LanceDB API key（空表示无鉴权）|
+| `CASE_REFINERY_KH_CODES` | `` | 逗号分隔的 policyId 列表（khCode 为其前缀） |
+| `CASE_REFINERY_SCHEDULE_CRON_HOUR` | `0` | 每日固定触发小时（默认 0 点） |
+| `CASE_REFINERY_SCHEDULE_CRON_MINUTE` | `0` | 每日固定触发分钟（默认 00 分） |
+| `CASE_REFINERY_SCHEDULE_INTERVAL_HOURS` | `0` | 调试覆盖：按小时间隔触发；>0 时覆盖 cron |
+| `CASE_REFINERY_SCHEDULE_INTERVAL_SECONDS` | `0` | 调试覆盖：按秒间隔触发；>0 时优先级最高 |
+| `CASE_REFINERY_LLM_VENDOR` | `servyou` | LLM vendor |
+| `CASE_REFINERY_LLM_MODEL` | `deepseek-v3.2-1163259bcc6c` | LLM model |
+| `CASE_REFINERY_REFINE_MAX_ATTEMPTS` | `5` | raw_fallback 累计尝试上限 |
+| `CASE_REFINERY_LOG_LEVEL` | `INFO` | 日志级别 |
+
+## 目录结构
+
+```
+case_refinery/
+├── README.md
+├── requirements.txt
+├── config.py              # 所有配置
+├── app.py                 # FastAPI 入口 + lifespan
+├── scheduler.py           # APScheduler 作业注册
+├── api/routes.py          # HTTP 路由
+├── pipeline/
+│   ├── upstream.py        # 上游 case 接口
+│   ├── classifier.py      # polarity 判定 + 哈希
+│   ├── prompts.py         # refine prompt 模板
+│   ├── refiner.py         # LLM refine 调用
+│   ├── lancedb_client.py  # v2 HTTP 客户端
+│   ├── dedupe.py          # 去重决策
+│   └── runner.py          # 任务编排
+├── vendor/                # 从主仓复制的依赖
+│   ├── llm_client.py
+│   └── utils_helpers.py
+└── tests/
+```
+
+## 测试
+
+```bash
+cd case_refinery
+pytest -q
+```
