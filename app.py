@@ -20,9 +20,20 @@ lifespan 负责：
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+# 支持 `python app.py` 直跑：补齐包上下文，保证相对导入可用。
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    _package_dir = os.path.dirname(os.path.abspath(__file__))
+    _parent_dir = os.path.dirname(_package_dir)
+    _package_name = os.path.basename(_package_dir)
+    if _parent_dir not in sys.path:
+        sys.path.insert(0, _parent_dir)
+    __package__ = _package_name
 
 from .api.routes import router as api_router
 from .config import get_settings
@@ -79,3 +90,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="case_refinery", version="0.1.0", lifespan=lifespan)
 app.include_router(api_router)
+
+
+def main() -> None:
+    """支持直接运行 `python app.py` 启动服务。"""
+    import uvicorn
+
+    host = os.getenv("CASE_REFINERY_HOST", "0.0.0.0")
+    port = int(os.getenv("CASE_REFINERY_PORT", "5000"))
+    reload_enabled = os.getenv("CASE_REFINERY_RELOAD", "0").lower() in {"1", "true", "yes"}
+
+    if reload_enabled:
+        uvicorn.run(f"{__package__}.app:app", host=host, port=port, reload=True)
+    else:
+        uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()
