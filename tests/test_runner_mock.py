@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from case_refinery.config import Settings, set_settings
-from case_refinery.pipeline import refiner, runner
+from case_refinery.pipeline import embedder, refiner, runner
 from case_refinery.pipeline.lancedb_client import (
     ExistingDoc,
     ExistingIndex,
@@ -119,6 +119,15 @@ def _patch_refine(
     monkeypatch.setattr(refiner, "refine", _fake)
 
 
+def _patch_embed(
+    monkeypatch: pytest.MonkeyPatch, vector: list[float] | None = None
+) -> None:
+    async def _fake(content: str, **kwargs):  # noqa: ARG001
+        return list(vector or [0.11, 0.22, 0.33])
+
+    monkeypatch.setattr(embedder, "embed_question_content", _fake)
+
+
 # ---------- 1: 上游空 ----------
 
 @pytest.mark.asyncio
@@ -155,6 +164,7 @@ async def test_upstream_error_aborts_run(monkeypatch: pytest.MonkeyPatch) -> Non
 async def test_new_case_refine_success(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_fetch_cases(monkeypatch, [_make_case()])
     _patch_refine(monkeypatch, ok=True)
+    _patch_embed(monkeypatch, [0.1, 0.2, 0.3])
     cli = FakeLanceClient()
 
     summary = await runner.run_once("KH_TEST", lancedb_client=cli)  # type: ignore[arg-type]
@@ -170,6 +180,7 @@ async def test_new_case_refine_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert doc["metadata"]["case_polarity"] == "positive"
     assert doc["metadata"]["refined_knowledge"]
     assert doc["metadata"]["case_uuid"]
+    assert doc["vector"] == [0.1, 0.2, 0.3]
 
 
 # ---------- 4: 新 case + refine 失败 ----------
@@ -178,6 +189,7 @@ async def test_new_case_refine_success(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_new_case_refine_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_fetch_cases(monkeypatch, [_make_case(expert_revised=True)])
     _patch_refine(monkeypatch, ok=False)
+    _patch_embed(monkeypatch, [1.0, 2.0])
     cli = FakeLanceClient()
 
     summary = await runner.run_once("KH_TEST", lancedb_client=cli)  # type: ignore[arg-type]
@@ -191,6 +203,7 @@ async def test_new_case_refine_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     assert md["refine_status"] == "raw_fallback"
     assert md["case_polarity"] == "negative"
     assert md["refined_knowledge"] == ""
+    assert doc["vector"] == [1.0, 2.0]
 
 
 # ---------- 5: 库内 refined 同 hash → skip ----------
@@ -237,6 +250,7 @@ async def test_raw_fallback_overwrite_success(monkeypatch: pytest.MonkeyPatch) -
 
     _patch_fetch_cases(monkeypatch, [case])
     _patch_refine(monkeypatch, ok=True)
+    _patch_embed(monkeypatch, [9.9, 8.8, 7.7])
 
     cli = FakeLanceClient(existing=ExistingIndex(
         by_record_hash={rh: ExistingDoc(
@@ -260,6 +274,7 @@ async def test_raw_fallback_overwrite_success(monkeypatch: pytest.MonkeyPatch) -
     md = doc["metadata"]
     assert md["refine_status"] == "refined"
     assert md["refine_attempts"] == 3
+    assert doc["vector"] == [9.9, 8.8, 7.7]
 
 
 # ---------- 7: 库内 raw_fallback + 本轮 refine 失败 → bump ----------
@@ -327,6 +342,7 @@ async def test_same_question_revision_tombstones_old_version(
 
     _patch_fetch_cases(monkeypatch, [new_case])
     _patch_refine(monkeypatch, ok=True)
+    _patch_embed(monkeypatch, [6.6, 6.7])
 
     cli = FakeLanceClient(existing=ExistingIndex(
         by_record_hash={old_rh: old_doc},

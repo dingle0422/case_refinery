@@ -34,6 +34,19 @@ def _env_float(key: str, default: float) -> float:
         return default
 
 
+def _env_float_compat(keys: list[str], default: float) -> float:
+    """按顺序读取多个浮点环境变量，返回第一个有效值。"""
+    for key in keys:
+        v = os.getenv(key)
+        if v is None or v == "":
+            continue
+        try:
+            return float(v)
+        except ValueError:
+            continue
+    return default
+
+
 def _env_bool(key: str, default: bool) -> bool:
     v = os.getenv(key)
     if v is None:
@@ -74,7 +87,16 @@ class Settings:
     )
     lancedb_api_key: str = _env_str("CASE_REFINERY_LANCEDB_API_KEY", "")
     lancedb_timeout_s: float = _env_float(
-        "CASE_REFINERY_LANCEDB_TIMEOUT_S", 30.0
+        "CASE_REFINERY_LANCEDB_TIMEOUT_S", 60.0
+    )
+    lancedb_max_retries: int = _env_int(
+        "CASE_REFINERY_LANCEDB_MAX_RETRIES", 2
+    )
+    lancedb_retry_backoff_s: float = _env_float(
+        "CASE_REFINERY_LANCEDB_RETRY_BACKOFF_S", 0.5
+    )
+    lancedb_retry_backoff_max_s: float = _env_float(
+        "CASE_REFINERY_LANCEDB_RETRY_BACKOFF_MAX_S", 4.0
     )
     lancedb_collection_prefix: str = _env_str(
         "CASE_REFINERY_LANCEDB_COLLECTION_PREFIX", "case_"
@@ -118,6 +140,28 @@ class Settings:
     )
     llm_enable_thinking: bool = _env_bool(
         "CASE_REFINERY_LLM_ENABLE_THINKING", False
+    )
+
+    # --- Embedding ---
+    embedding_base_url: str = _env_str(
+        "CASE_REFINERY_EMBEDDING_BASE_URL",
+        "http://mlp.paas.dc.servyou-it.com/qwen3-embedding/v1",
+    )
+    embedding_path: str = _env_str(
+        "CASE_REFINERY_EMBEDDING_PATH", "/embeddings"
+    )
+    embedding_model: str = _env_str(
+        "CASE_REFINERY_EMBEDDING_MODEL", "qwen3-embedding"
+    )
+    embedding_api_key: str = _env_str(
+        "CASE_REFINERY_EMBEDDING_API_KEY", ""
+    )
+    embedding_timeout_sec: float = _env_float_compat(
+        [
+            "CASE_REFINERY_EMBEDDING_TIMEOUT_SEC",
+            "CASE_REFINERY_EMBEDDING_TIMEOUT_S",
+        ],
+        10.0,
     )
 
     # --- 业务 ---

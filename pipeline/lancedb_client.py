@@ -8,8 +8,8 @@
 - ``POST /v2/collections/{cid}/documents:upsert``             写入 / merge
 
 向量策略：
-- 客户端 **不计算** embedding，``vector=[]`` 留空发出
-- LanceDB v2 服务端 fallback 用 ``content`` 自动 embed（见 v2 文档 L98）
+- 客户端先完成 embedding，把 ``vector`` 直接写入 upsert payload
+- ``content`` 仍保持 ``questionContent`` 明文，便于审计与回溯
 
 删除策略（MVP，等服务端补单文档 DELETE 接口前的过渡）：
 - 同 doc_id + ``mode="merge_by_chunk_id"`` 改写 ``metadata.tombstoned=true``
@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -102,23 +103,61 @@ class LanceDBV2Client:
     # ------------------------------------------------------------------ 基础调用
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
-        try:
-            resp = await self._client.request(method, path, **kwargs)
-        except httpx.HTTPError as e:
-            raise LanceDBError(f"{method} {path} 网络异常: {e}") from e
+        max_retries = max(int(self._s.lancedb_max_retries), 0)
+        max_attempts = max_retries + 1
 
-        if resp.status_code >= 400:
-            raise LanceDBError(
-                f"{method} {path} -> {resp.status_code}: {resp.text[:300]!r}"
-            )
-        if not resp.content:
-            return None
-        try:
-            return resp.json()
-        except Exception as e:  # noqa: BLE001
-            raise LanceDBError(
-                f"{method} {path} 响应非 JSON: {e}; body={resp.text[:300]!r}"
-            ) from e
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = await self._client.request(method, path, **kwargs)
+            except httpx.HTTPError as e:
+                if attempt < max_attempts and _is_retryable_http_error(e):
+                    delay = _retry_delay_s(
+                        attempt,
+                        base_s=self._s.lancedb_retry_backoff_s,
+                        max_s=self._s.lancedb_retry_backoff_max_s,
+                    )
+                    logger.warning(
+                        "[lancedb] %s %s 网络异常（attempt %d/%d）: %s; %.2fs 后重试",
+                        method, path, attempt, max_attempts, e, delay,
+                    )
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                    continue
+                raise LanceDBError(f"{method} {path} 网络异常: {e}") from e
+
+            if resp.status_code >= 500 and attempt < max_attempts:
+                delay = _retry_delay_s(
+                    attempt,
+                    base_s=self._s.lancedb_retry_backoff_s,
+                    max_s=self._s.lancedb_retry_backoff_max_s,
+                )
+                logger.warning(
+                    "[lancedb] %s %s -> %d（attempt %d/%d）; %.2fs 后重试",
+                    method,
+                    path,
+                    resp.status_code,
+                    attempt,
+                    max_attempts,
+                    delay,
+                )
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                continue
+
+            if resp.status_code >= 400:
+                raise LanceDBError(
+                    f"{method} {path} -> {resp.status_code}: {resp.text[:300]!r}"
+                )
+            if not resp.content:
+                return None
+            try:
+                return resp.json()
+            except Exception as e:  # noqa: BLE001
+                raise LanceDBError(
+                    f"{method} {path} 响应非 JSON: {e}; body={resp.text[:300]!r}"
+                ) from e
+
+        raise LanceDBError(f"{method} {path} 重试后仍失败")
 
     # ------------------------------------------------------------------ 能力
 
@@ -225,7 +264,9 @@ class LanceDBV2Client:
             "documents": [document],
             "mode": mode,
         }
-        # 不传 expected_dim，让服务端按 content 自动 embed
+        vector = document.get("vector")
+        if isinstance(vector, list) and vector:
+            body["expected_dim"] = len(vector)
         return await self._request(
             "POST",
             f"/v2/collections/{collection_id}/documents:upsert",
@@ -293,3 +334,13 @@ def _now_ms() -> int:
     import time
 
     return int(time.time() * 1000)
+
+
+def _is_retryable_http_error(exc: httpx.HTTPError) -> bool:
+    return isinstance(exc, (httpx.TimeoutException, httpx.TransportError))
+
+
+def _retry_delay_s(attempt: int, *, base_s: float, max_s: float) -> float:
+    safe_base = max(float(base_s), 0.0)
+    safe_max = max(float(max_s), safe_base)
+    return min(safe_base * (2 ** max(attempt - 1, 0)), safe_max)

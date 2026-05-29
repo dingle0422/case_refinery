@@ -27,7 +27,7 @@ APScheduler tick (per khCode)
 
 关键设计：
 - LLM refine 仅对 dedupe 后真正需要写入或覆盖的子集触发，避免无效 token 消耗。
-- `vector` 留空，由 LanceDB v2 服务端基于 `content`（= `questionContent`）自动 embed。
+- `vector` 由客户端先基于 `questionContent` 计算 embedding，再随 upsert 一起写入 LanceDB。
 - 同 `question_hash` 不同 `record_hash` 的旧版本：通过 tombstone 标记（`md_tombstoned_*`）软删，主仓召回时通过 `where` 过滤掉。
 - 失踪 case（库内存在但本轮上游未返回）保留不删；上游报错/空返回整轮 abort，不污染库存。
 
@@ -78,6 +78,10 @@ curl -X POST http://127.0.0.1:8090/trigger
 | `CASE_REFINERY_UPSTREAM_LIST_PATH` | `/api/kh/listCorpusByKhCode` | case 列表接口路径（入参 `khCode`） |
 | `CASE_REFINERY_LANCEDB_BASE_URL` | `http://mlp.paas.dc.servyou-it.com/kh-lancedb` | LanceDB v2 base |
 | `CASE_REFINERY_LANCEDB_API_KEY` | `` | LanceDB API key（空表示无鉴权）|
+| `CASE_REFINERY_LANCEDB_TIMEOUT_S` | `60.0` | LanceDB 请求超时（秒） |
+| `CASE_REFINERY_LANCEDB_MAX_RETRIES` | `2` | LanceDB 网络异常/5xx 最大重试次数 |
+| `CASE_REFINERY_LANCEDB_RETRY_BACKOFF_S` | `0.5` | LanceDB 重试退避基数（秒，指数退避） |
+| `CASE_REFINERY_LANCEDB_RETRY_BACKOFF_MAX_S` | `4.0` | LanceDB 单次退避上限（秒） |
 | `CASE_REFINERY_KH_CODES` | `` | 可选保留项（当前全量调度不依赖） |
 | `CASE_REFINERY_SCHEDULE_CRON_HOUR` | `0` | 每日固定触发小时（默认 0 点） |
 | `CASE_REFINERY_SCHEDULE_CRON_MINUTE` | `0` | 每日固定触发分钟（默认 00 分） |
@@ -85,6 +89,12 @@ curl -X POST http://127.0.0.1:8090/trigger
 | `CASE_REFINERY_SCHEDULE_INTERVAL_SECONDS` | `0` | 调试覆盖：按秒间隔触发；>0 时优先级最高 |
 | `CASE_REFINERY_LLM_VENDOR` | `servyou` | LLM vendor |
 | `CASE_REFINERY_LLM_MODEL` | `deepseek-v3.2-1163259bcc6c` | LLM model |
+| `CASE_REFINERY_EMBEDDING_BASE_URL` | `http://mlp.paas.dc.servyou-it.com/qwen3-embedding/v1` | Embedding 服务 base URL |
+| `CASE_REFINERY_EMBEDDING_PATH` | `/embeddings` | Embedding 接口路径 |
+| `CASE_REFINERY_EMBEDDING_MODEL` | `qwen3-embedding` | Embedding 模型名 |
+| `CASE_REFINERY_EMBEDDING_API_KEY` | `` | Embedding 鉴权 key（空表示无鉴权） |
+| `CASE_REFINERY_EMBEDDING_TIMEOUT_SEC` | `10.0` | Embedding 请求超时（秒） |
+| `CASE_REFINERY_EMBEDDING_TIMEOUT_S` | （兼容别名） | 旧变量名；未设置 `..._SEC` 时会回退读取 |
 | `CASE_REFINERY_REFINE_MAX_ATTEMPTS` | `5` | raw_fallback 累计尝试上限 |
 | `CASE_REFINERY_LOG_LEVEL` | `INFO` | 日志级别 |
 

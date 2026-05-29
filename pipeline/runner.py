@@ -8,7 +8,8 @@
    - :func:`classifier.classify` + :func:`classifier.record_hash` + :func:`classifier.question_hash`
    - :func:`dedupe.decide` 决策（是否需要 refine、成功/失败动作、tombstone 目标）
    - 若 ``need_refine=True``：:func:`refiner.refine` 调 LLM
-   - 根据 refine 结果与决策，构造目标 document 并调用 :meth:`LanceDBV2Client.upsert_one`
+   - 根据 refine 结果与决策，先对 ``questionContent`` 做 embedding，再构造目标
+     document 调用 :meth:`LanceDBV2Client.upsert_one`
    - 入库成功后软删同 question_hash 旧版本（:meth:`LanceDBV2Client.tombstone_docs`）
 
 错误隔离：任何单条 case 的异常都被吃掉、计入 ``errors``，不影响后续 case；上游
@@ -26,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import Settings, get_settings
-from . import classifier, dedupe, refiner
+from . import classifier, dedupe, embedder, refiner
 from .lancedb_client import ExistingDoc, ExistingIndex, LanceDBError, LanceDBV2Client
 from .upstream import CaseDict, UpstreamError, fetch_all_kh_codes, fetch_cases
 
@@ -101,6 +102,7 @@ def _build_insert_document(
     *,
     kh_code: str,
     polarity: str,
+    content_vector: list[float],
     record_hash: str,
     question_hash: str,
     refined_knowledge: str,
@@ -114,8 +116,8 @@ def _build_insert_document(
     return {
         "document_id": _resolve_document_id(doc_id, record_hash=record_hash),
         "content": case.get("questionContent") or "",
-        "content_tokenized": "",   # 服务端 fallback 简单分词
-        "vector": [],              # 服务端按 content 自动 embed
+        "content_tokenized": "",
+        "vector": list(content_vector),  # 客户端预计算 embedding（基于 questionContent）
         "metadata": {
             "kh_code": kh_code,
             "source": "case_refinery",
@@ -289,10 +291,20 @@ async def _process_one_case(
         summary.skipped += 1
         return
 
+    content_vector: list[float] | None = None
+    if chosen_action in {"insert", "overwrite_raw_fallback"}:
+        content_vector = await embedder.embed_question_content(
+            raw.get("questionContent") or "",
+            settings=settings,
+        )
+        if not content_vector:
+            raise RuntimeError("embedding returned empty vector")
+
     if chosen_action == "insert":
         if result.ok:
             doc = _build_insert_document(
                 raw, kh_code=kh_code, polarity=polarity,
+                content_vector=content_vector,
                 record_hash=rh, question_hash=qh,
                 refined_knowledge=result.refined_knowledge,
                 refine_status="refined",
@@ -304,6 +316,7 @@ async def _process_one_case(
         else:
             doc = _build_insert_document(
                 raw, kh_code=kh_code, polarity=polarity,
+                content_vector=content_vector,
                 record_hash=rh, question_hash=qh,
                 refined_knowledge="",
                 refine_status="raw_fallback",
@@ -321,6 +334,7 @@ async def _process_one_case(
         assert decision.existing_doc_id is not None
         doc = _build_insert_document(
             raw, kh_code=kh_code, polarity=polarity,
+            content_vector=content_vector,
             record_hash=rh, question_hash=qh,
             refined_knowledge=result.refined_knowledge,
             refine_status="refined",
