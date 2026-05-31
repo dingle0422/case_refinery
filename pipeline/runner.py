@@ -159,9 +159,9 @@ def _build_bump_document(
 ) -> dict:
     """raw_fallback 上限内但本轮 refine 又失败时，只更新 attempts + 时间戳。
 
-    与 ``tombstone_docs`` 同样依赖 ``mode=merge_by_chunk_id``。content / vector 留空，
-    与 :meth:`LanceDBV2Client.tombstone_docs` 中的注释一致——若 v2 后续证实是「整行
-    替换」，需要切到「拉 content 后回写」方案。
+    与 ``tombstone_docs`` 同样依赖 ``mode=merge_by_chunk_id``。content / vector 留空：
+    v2 已确认 ``merge_by_chunk_id`` 为字段级安全合并，空 content/content_tokenized/vector
+    不会覆盖旧值（见 docs/lancedb_v2_api.md §5.5），所以这里只需带上要更新的 metadata。
     """
     return {
         "document_id": _resolve_document_id(

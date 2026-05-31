@@ -260,12 +260,21 @@ class LanceDBV2Client:
             raise LanceDBError("document_id 必填")
 
         collection_id = self._s.collection_id(kh_code)
+        vector = document.get("vector")
+        has_vector = isinstance(vector, list) and len(vector) > 0
+        # 防呆：只有 merge_by_chunk_id（局部 metadata 更新，如 bump/tombstone）才允许空
+        # vector；append / overwrite 这类写内容的操作必须自带客户端预算好的向量，绝不
+        # 依赖服务端 embedding 兜底（兜底会掩盖向量缺失，且与本服务「客户端预计算」契约不符）。
+        if mode != "merge_by_chunk_id" and not has_vector:
+            raise LanceDBError(
+                f"mode={mode} 要求非空 vector，但 document_id={doc_id} 未带向量"
+            )
+
         body = {
             "documents": [document],
             "mode": mode,
         }
-        vector = document.get("vector")
-        if isinstance(vector, list) and vector:
+        if has_vector:
             body["expected_dim"] = len(vector)
         return await self._request(
             "POST",
@@ -294,11 +303,10 @@ class LanceDBV2Client:
         for t in targets:
             doc = {
                 "document_id": _coerce_lance_document_id(t.doc_id),
-                # content / vector / content_tokenized 必须带上，否则 merge 之后这些
-                # 字段会被空值覆盖。为了避免在 list_existing 阶段把 content 也拉下来，
-                # 这里直接传空串/空数组——服务端 fallback 行为是「保留原向量、用空
-                # content 重算分词」。如果 v2 实际是「整行替换」，会在生产端先冒
-                # 烟，再决定是否切换到拉 content 后回写的方案。
+                # content / vector / content_tokenized 直接传空串/空数组：v2 的
+                # merge_by_chunk_id 是字段级安全合并，空值不会覆盖旧的 content / vector
+                # （见 docs/lancedb_v2_api.md §5.5），因此无需在 list_existing 阶段把
+                # content 拉下来回写，只更新 metadata.tombstoned 即可。
                 "content": "",
                 "content_tokenized": "",
                 "vector": [],
