@@ -101,6 +101,11 @@ class Settings:
     lancedb_collection_prefix: str = _env_str(
         "CASE_REFINERY_LANCEDB_COLLECTION_PREFIX", "case_"
     )
+    # list documents 接口分页的单页条数（v2 limit 范围 1..100000）。
+    # 用 limit + offset 循环翻页拉全量，单页过大有内存/超时风险，默认 10000。
+    lancedb_list_page_size: int = _env_int(
+        "CASE_REFINERY_LANCEDB_LIST_PAGE_SIZE", 10000
+    )
 
     # --- 调度 ---
     kh_codes: list[str] = field(

@@ -192,53 +192,78 @@ class LanceDBV2Client:
             )
             return ExistingIndex()
 
-        params = {
-            "include_content": "false",
-        }
-        data = await self._request(
-            "GET",
-            f"/v2/collections/{collection_id}/documents",
-            params=params,
-        )
-        docs = (data or {}).get("documents") or []
+        # v2 list 接口按 limit + offset 翻页：单页 limit 条，
+        # 返回数量 < limit 即为最后一页（接口不返回总数）。
+        # 不依赖单次大 limit 一把梭，量大时有内存/超时风险。
+        page_size = self._s.lancedb_list_page_size
 
         index = ExistingIndex()
         skipped_tombstoned = 0
         skipped_malformed = 0
-        for d in docs:
-            if not isinstance(d, dict):
-                skipped_malformed += 1
-                continue
-            md = d.get("metadata") or {}
-            rh = md.get("record_hash")
-            qh = md.get("question_hash")
-            if not rh or not qh:
-                skipped_malformed += 1
-                continue
-            tombstoned = bool(md.get("tombstoned", False))
-            if tombstoned:
-                skipped_tombstoned += 1
-                continue
-
-            ed = ExistingDoc(
-                doc_id=str(d.get("document_id") or ""),
-                record_hash=str(rh),
-                question_hash=str(qh),
-                refine_status=str(md.get("refine_status") or "raw_fallback"),
-                refine_attempts=int(md.get("refine_attempts") or 0),
-                tombstoned=False,
+        offset = 0
+        fetched = 0
+        page = 0
+        while True:
+            params = {
+                "include_content": "false",
+                "limit": page_size,
+                "offset": offset,
+            }
+            data = await self._request(
+                "GET",
+                f"/v2/collections/{collection_id}/documents",
+                params=params,
             )
-            if not ed.doc_id:
-                skipped_malformed += 1
-                continue
+            docs = (data or {}).get("documents") or []
+            n = len(docs)
+            fetched += n
+            page += 1
+            logger.debug(
+                "[lancedb] %s 翻页 page=%d offset=%d 返回=%d",
+                collection_id, page, offset, n,
+            )
 
-            # 同 record_hash 重复（理论上不该出现，保留最后一条）：
-            index.by_record_hash[ed.record_hash] = ed
-            index.by_question_hash.setdefault(ed.question_hash, []).append(ed)
+            for d in docs:
+                if not isinstance(d, dict):
+                    skipped_malformed += 1
+                    continue
+                md = d.get("metadata") or {}
+                rh = md.get("record_hash")
+                qh = md.get("question_hash")
+                if not rh or not qh:
+                    skipped_malformed += 1
+                    continue
+                tombstoned = bool(md.get("tombstoned", False))
+                if tombstoned:
+                    skipped_tombstoned += 1
+                    continue
+
+                ed = ExistingDoc(
+                    doc_id=str(d.get("document_id") or ""),
+                    record_hash=str(rh),
+                    question_hash=str(qh),
+                    refine_status=str(md.get("refine_status") or "raw_fallback"),
+                    refine_attempts=int(md.get("refine_attempts") or 0),
+                    tombstoned=False,
+                )
+                if not ed.doc_id:
+                    skipped_malformed += 1
+                    continue
+
+                # 同 record_hash 重复（理论上不该出现，保留最后一条）：
+                index.by_record_hash[ed.record_hash] = ed
+                index.by_question_hash.setdefault(ed.question_hash, []).append(ed)
+
+            # 返回数量小于一页 → 已到最后一页，停止翻页。
+            if n < page_size:
+                break
+            offset += page_size
 
         logger.info(
-            "[lancedb] %s 索引构建：total=%d, tombstoned_skip=%d, malformed_skip=%d",
-            collection_id, index.total(), skipped_tombstoned, skipped_malformed,
+            "[lancedb] %s 索引构建：fetched=%d, pages=%d, total=%d, "
+            "tombstoned_skip=%d, malformed_skip=%d",
+            collection_id, fetched, page, index.total(),
+            skipped_tombstoned, skipped_malformed,
         )
         return index
 
