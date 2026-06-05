@@ -1,0 +1,2757 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "2153268df59ce83bc9448ecfff13743ff8e20627",
+  "generatedAt": "2026-06-05T05:26:57.371Z",
+  "files": {
+    "__init__.py": {
+      "filePath": "__init__.py",
+      "contentHash": "8a566061e12103f23bb36a2f615f57f9876051d8ddb0ce3821d20cfef086e6df",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    ".DS_Store": {
+      "filePath": ".DS_Store",
+      "contentHash": "5647cbdfbc9efaff0a610c6e180d0f37ba7f5a1beca82db0dd3657076a5f96d6",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 3,
+      "hasStructuralAnalysis": false
+    },
+    ".understand-anything/.understandignore": {
+      "filePath": ".understand-anything/.understandignore",
+      "contentHash": "634074f3d8754504da93dcc1705cbd4995606f9bb66bb30b67d596809ac48098",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 20,
+      "hasStructuralAnalysis": false
+    },
+    ".understand-anything/intermediate/scan-result.json": {
+      "filePath": ".understand-anything/intermediate/scan-result.json",
+      "contentHash": "9d5d85411513da51ce8ca59374f927e2342efcada2957a4a166da0eb5eac0a99",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 335,
+      "hasStructuralAnalysis": true
+    },
+    ".understand-anything/tmp/ua-import-map-input.json": {
+      "filePath": ".understand-anything/tmp/ua-import-map-input.json",
+      "contentHash": "d0d030024205c3a0d3bd5f3e1328d606e68cee2f5d6b1e11f8d7fdc7c84a360c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": true
+    },
+    ".understand-anything/tmp/ua-import-map-output.json": {
+      "filePath": ".understand-anything/tmp/ua-import-map-output.json",
+      "contentHash": "24cc58f193ec1ffe53c649c281b7d993b6122f6a97dade130e8db2e275f01724",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 82,
+      "hasStructuralAnalysis": true
+    },
+    ".understand-anything/tmp/ua-scan-files.json": {
+      "filePath": ".understand-anything/tmp/ua-scan-files.json",
+      "contentHash": "a76212533a65ba931817931044953613a900600400edae6c5171882057ad1eef",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 259,
+      "hasStructuralAnalysis": true
+    },
+    "api/__init__.py": {
+      "filePath": "api/__init__.py",
+      "contentHash": "f9046a36de098f47a92d2aad7c9b3ef00e2b8a8dbd174e624ac13aa02a8693e3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": true
+    },
+    "api/routes.py": {
+      "filePath": "api/routes.py",
+      "contentHash": "51a4e21b9b06324574fef6696c775363affc55d3df08d63908b27656f0acce8d",
+      "functions": [
+        {
+          "name": "healthz",
+          "params": [],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "status",
+          "params": [],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "trigger_all_route",
+          "params": [],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "trigger_one_route",
+          "params": [
+            "kh_code"
+          ],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "fastapi",
+          "specifiers": [
+            "APIRouter",
+            "HTTPException"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "get_settings"
+          ]
+        },
+        {
+          "source": "..scheduler",
+          "specifiers": [
+            "status_snapshot",
+            "trigger_all",
+            "trigger_kh_code"
+          ]
+        }
+      ],
+      "exports": [
+        "healthz",
+        "status",
+        "trigger_all_route",
+        "trigger_one_route"
+      ],
+      "totalLines": 71,
+      "hasStructuralAnalysis": true
+    },
+    "app.py": {
+      "filePath": "app.py",
+      "contentHash": "37ba01e2aa1b9b9e9d17e2ee68627d4cb50214c170476718c3b3f86d70df2549",
+      "functions": [
+        {
+          "name": "_setup_logging",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "lifespan",
+          "params": [
+            "app"
+          ],
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "_apply_cli_overrides",
+          "params": [
+            "argv"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "main",
+          "params": [
+            "argv"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "argparse",
+          "specifiers": [
+            "argparse"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "contextlib",
+          "specifiers": [
+            "asynccontextmanager"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "replace"
+          ]
+        },
+        {
+          "source": "fastapi",
+          "specifiers": [
+            "FastAPI"
+          ]
+        },
+        {
+          "source": ".api.routes",
+          "specifiers": [
+            "api_router"
+          ]
+        },
+        {
+          "source": ".config",
+          "specifiers": [
+            "Settings",
+            "get_settings",
+            "set_settings"
+          ]
+        },
+        {
+          "source": ".pipeline.lancedb_client",
+          "specifiers": [
+            "LanceDBError",
+            "LanceDBV2Client"
+          ]
+        },
+        {
+          "source": ".scheduler",
+          "specifiers": [
+            "build_scheduler",
+            "mark_scheduler_started"
+          ]
+        }
+      ],
+      "exports": [
+        "_setup_logging",
+        "lifespan",
+        "_apply_cli_overrides",
+        "main"
+      ],
+      "totalLines": 140,
+      "hasStructuralAnalysis": true
+    },
+    "config.py": {
+      "filePath": "config.py",
+      "contentHash": "1adc9e2f33c518ce31b6f72eec4efd2dc1a1f9721fb8a7853e56f1232618c644",
+      "functions": [
+        {
+          "name": "_env_str",
+          "params": [
+            "key",
+            "default"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "_env_int",
+          "params": [
+            "key",
+            "default"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "_env_float",
+          "params": [
+            "key",
+            "default"
+          ],
+          "returnType": "float",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "_env_float_compat",
+          "params": [
+            "keys",
+            "default"
+          ],
+          "returnType": "float",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "_env_bool",
+          "params": [
+            "key",
+            "default"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "_env_csv",
+          "params": [
+            "key",
+            "default"
+          ],
+          "returnType": "list[str]",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "get_settings",
+          "params": [],
+          "returnType": "Settings",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "set_settings",
+          "params": [
+            "s"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "classes": [
+        {
+          "name": "Settings",
+          "methods": [
+            "schedule_interval_label",
+            "collection_id"
+          ],
+          "properties": [
+            "upstream_base_url",
+            "upstream_list_all_path",
+            "upstream_list_path",
+            "upstream_timeout_s",
+            "lancedb_base_url",
+            "lancedb_api_key",
+            "lancedb_timeout_s",
+            "lancedb_max_retries",
+            "lancedb_retry_backoff_s",
+            "lancedb_retry_backoff_max_s",
+            "lancedb_collection_prefix",
+            "lancedb_list_page_size",
+            "kh_codes",
+            "schedule_cron_hour",
+            "schedule_cron_minute",
+            "schedule_interval_hours",
+            "schedule_interval_seconds",
+            "schedule_enabled",
+            "llm_vendor",
+            "llm_model",
+            "llm_enable_thinking",
+            "embedding_base_url",
+            "embedding_path",
+            "embedding_model",
+            "embedding_api_key",
+            "embedding_timeout_sec",
+            "refine_max_attempts",
+            "log_level"
+          ],
+          "exported": true,
+          "lineCount": 117
+        }
+      ],
+      "imports": [
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass",
+            "field"
+          ]
+        }
+      ],
+      "exports": [
+        "_env_str",
+        "_env_int",
+        "_env_float",
+        "_env_float_compat",
+        "_env_bool",
+        "_env_csv",
+        "Settings",
+        "get_settings",
+        "set_settings"
+      ],
+      "totalLines": 198,
+      "hasStructuralAnalysis": true
+    },
+    "data/case_refined_refresh.xlsx": {
+      "filePath": "data/case_refined_refresh.xlsx",
+      "contentHash": "8f69af5022db0f78d9e569c765e2bd8daaf1bf4990f009542cd6c4ece7d130cb",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 120002,
+      "hasStructuralAnalysis": false
+    },
+    "docs/lancedb_v2_api.md": {
+      "filePath": "docs/lancedb_v2_api.md",
+      "contentHash": "969c4f297c5ded683fca7e2f24ba1cf311bd0f0c4216a4d36e12e7eddaada2e9",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 719,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/__init__.py": {
+      "filePath": "pipeline/__init__.py",
+      "contentHash": "bc941ccef9a28f42475c3c719a1e88099a0996671c7c7dea59f417d4813a8df6",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 14,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/classifier.py": {
+      "filePath": "pipeline/classifier.py",
+      "contentHash": "9100340f63a61ada21877421d3be155956ad1360fa67c96cd0c6ba6bb886b16f",
+      "functions": [
+        {
+          "name": "classify",
+          "params": [
+            "case"
+          ],
+          "returnType": "Polarity",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "is_expert_revised",
+          "params": [
+            "case"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "record_hash",
+          "params": [
+            "case"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "question_hash",
+          "params": [
+            "case"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "hashlib",
+          "specifiers": [
+            "hashlib"
+          ]
+        },
+        {
+          "source": "json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Literal"
+          ]
+        },
+        {
+          "source": ".upstream",
+          "specifiers": [
+            "CaseDict"
+          ]
+        }
+      ],
+      "exports": [
+        "classify",
+        "is_expert_revised",
+        "record_hash",
+        "question_hash"
+      ],
+      "totalLines": 64,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/dedupe.py": {
+      "filePath": "pipeline/dedupe.py",
+      "contentHash": "a169eff1ccfc22848ba689505e487795a37ef03581155081cd5854eea12b500b",
+      "functions": [
+        {
+          "name": "_collect_tombstone_victims",
+          "params": [
+            "question_hash",
+            "record_hash",
+            "existing",
+            "keep_doc_id"
+          ],
+          "returnType": "list[str]",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "decide",
+          "params": [
+            "record_hash",
+            "question_hash",
+            "existing",
+            "refine_max_attempts"
+          ],
+          "returnType": "Decision",
+          "exported": true,
+          "lineCount": 57
+        }
+      ],
+      "classes": [
+        {
+          "name": "Decision",
+          "methods": [],
+          "properties": [
+            "need_refine",
+            "on_refine_success",
+            "on_refine_failure",
+            "existing_doc_id",
+            "existing_refine_attempts",
+            "tombstone_doc_ids",
+            "reason"
+          ],
+          "exported": true,
+          "lineCount": 8
+        }
+      ],
+      "imports": [
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass",
+            "field"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Literal"
+          ]
+        },
+        {
+          "source": ".lancedb_client",
+          "specifiers": [
+            "ExistingIndex"
+          ]
+        }
+      ],
+      "exports": [
+        "Decision",
+        "_collect_tombstone_victims",
+        "decide"
+      ],
+      "totalLines": 126,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/embedder.py": {
+      "filePath": "pipeline/embedder.py",
+      "contentHash": "28b086605bcd56752b027df2c31775a6fba6a77d07d17cafe5af76a3bfb6424a",
+      "functions": [
+        {
+          "name": "embed_question_content",
+          "params": [
+            "content",
+            "settings"
+          ],
+          "returnType": "list[float]",
+          "exported": true,
+          "lineCount": 19
+        }
+      ],
+      "classes": [
+        {
+          "name": "EmbedError",
+          "methods": [],
+          "properties": [],
+          "exported": true,
+          "lineCount": 2
+        }
+      ],
+      "imports": [
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": "..vendor.embedding_client",
+          "specifiers": [
+            "embedding_embed"
+          ]
+        }
+      ],
+      "exports": [
+        "EmbedError",
+        "embed_question_content"
+      ],
+      "totalLines": 41,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/lancedb_client.py": {
+      "filePath": "pipeline/lancedb_client.py",
+      "contentHash": "256bd3aa38bec0cd0f7adabce00f8dd7ea79f6fa8c3bc492974b68fff34539d8",
+      "functions": [
+        {
+          "name": "_coerce_lance_document_id",
+          "params": [
+            "doc_id"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "_now_ms",
+          "params": [],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "_is_retryable_http_error",
+          "params": [
+            "exc"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "_retry_delay_s",
+          "params": [
+            "attempt",
+            "base_s",
+            "max_s"
+          ],
+          "returnType": "float",
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "classes": [
+        {
+          "name": "LanceDBError",
+          "methods": [],
+          "properties": [],
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "ExistingDoc",
+          "methods": [],
+          "properties": [
+            "doc_id",
+            "record_hash",
+            "question_hash",
+            "refine_status",
+            "refine_attempts",
+            "tombstoned"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "ExistingIndex",
+          "methods": [
+            "total"
+          ],
+          "properties": [
+            "by_record_hash",
+            "by_question_hash"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "LanceDBV2Client",
+          "methods": [
+            "__init__",
+            "aclose",
+            "_request",
+            "capabilities",
+            "get_collection_meta",
+            "list_existing",
+            "upsert_one",
+            "tombstone_docs"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 285
+        }
+      ],
+      "imports": [
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass",
+            "field"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any"
+          ]
+        },
+        {
+          "source": "httpx",
+          "specifiers": [
+            "httpx"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        }
+      ],
+      "exports": [
+        "_coerce_lance_document_id",
+        "LanceDBError",
+        "ExistingDoc",
+        "ExistingIndex",
+        "LanceDBV2Client",
+        "_now_ms",
+        "_is_retryable_http_error",
+        "_retry_delay_s"
+      ],
+      "totalLines": 380,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/prompts.py": {
+      "filePath": "pipeline/prompts.py",
+      "contentHash": "5339e65d0b4afaa6d76c13d6307ed54e00f417b18c8b8299dd54557ccd3f41a4",
+      "functions": [
+        {
+          "name": "render_positive",
+          "params": [
+            "case"
+          ],
+          "returnType": "tuple[str, str]",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "render_negative",
+          "params": [
+            "case"
+          ],
+          "returnType": "tuple[str, str]",
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any"
+          ]
+        }
+      ],
+      "exports": [
+        "render_positive",
+        "render_negative"
+      ],
+      "totalLines": 109,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/refiner.py": {
+      "filePath": "pipeline/refiner.py",
+      "contentHash": "277ad723a53a3a5cfcff1fc13c9e5abdd6d29021c116337aecec701b7f4c38ec",
+      "functions": [
+        {
+          "name": "_clean_llm_output",
+          "params": [
+            "text"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "refine",
+          "params": [
+            "case",
+            "polarity",
+            "settings"
+          ],
+          "returnType": "RefineResult",
+          "exported": true,
+          "lineCount": 39
+        }
+      ],
+      "classes": [
+        {
+          "name": "RefineResult",
+          "methods": [],
+          "properties": [
+            "ok",
+            "refined_knowledge",
+            "error"
+          ],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "imports": [
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "re",
+          "specifiers": [
+            "re"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Literal"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": "..vendor.llm_client",
+          "specifiers": [
+            "llm_chat"
+          ]
+        },
+        {
+          "source": ".",
+          "specifiers": [
+            "prompts"
+          ]
+        },
+        {
+          "source": ".upstream",
+          "specifiers": [
+            "CaseDict"
+          ]
+        }
+      ],
+      "exports": [
+        "RefineResult",
+        "_clean_llm_output",
+        "refine"
+      ],
+      "totalLines": 100,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/runner.py": {
+      "filePath": "pipeline/runner.py",
+      "contentHash": "3e845826f3f07b8bf650477717c7c449bdf7c3902d7a87c27be16827174c9981",
+      "functions": [
+        {
+          "name": "_now_ms",
+          "params": [],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "_int_from_hash",
+          "params": [
+            "text"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "_resolve_document_id",
+          "params": [
+            "doc_id",
+            "record_hash"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "_build_insert_document",
+          "params": [
+            "case",
+            "kh_code",
+            "polarity",
+            "content_vector",
+            "record_hash",
+            "question_hash",
+            "refined_knowledge",
+            "refine_status",
+            "refine_attempts",
+            "refined_at_ms",
+            "doc_id",
+            "case_uuid"
+          ],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 53
+        },
+        {
+          "name": "_build_bump_document",
+          "params": [
+            "existing_doc",
+            "kh_code"
+          ],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 31
+        },
+        {
+          "name": "run_once",
+          "params": [
+            "kh_code",
+            "settings",
+            "lancedb_client"
+          ],
+          "returnType": "RunSummary",
+          "exported": true,
+          "lineCount": 58
+        },
+        {
+          "name": "_process_one_case",
+          "params": [
+            "raw",
+            "kh_code",
+            "existing",
+            "summary",
+            "settings",
+            "cli"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 139
+        },
+        {
+          "name": "run_all",
+          "params": [
+            "settings"
+          ],
+          "returnType": "list[RunSummary]",
+          "exported": true,
+          "lineCount": 26
+        }
+      ],
+      "classes": [
+        {
+          "name": "RunSummary",
+          "methods": [
+            "as_dict"
+          ],
+          "properties": [
+            "kh_code",
+            "started_at_ms",
+            "finished_at_ms",
+            "upstream_fetched",
+            "inserted_refined",
+            "inserted_raw_fallback",
+            "overwritten_to_refined",
+            "bumped_attempts",
+            "skipped",
+            "tombstoned",
+            "errors",
+            "aborted"
+          ],
+          "exported": true,
+          "lineCount": 33
+        }
+      ],
+      "imports": [
+        {
+          "source": "hashlib",
+          "specifiers": [
+            "hashlib"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "time",
+          "specifiers": [
+            "time"
+          ]
+        },
+        {
+          "source": "uuid",
+          "specifiers": [
+            "uuid"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass",
+            "field"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": ".",
+          "specifiers": [
+            "classifier",
+            "dedupe",
+            "embedder",
+            "refiner"
+          ]
+        },
+        {
+          "source": ".lancedb_client",
+          "specifiers": [
+            "ExistingDoc",
+            "ExistingIndex",
+            "LanceDBError",
+            "LanceDBV2Client"
+          ]
+        },
+        {
+          "source": ".upstream",
+          "specifiers": [
+            "CaseDict",
+            "UpstreamError",
+            "fetch_all_kh_codes",
+            "fetch_cases"
+          ]
+        }
+      ],
+      "exports": [
+        "RunSummary",
+        "_now_ms",
+        "_int_from_hash",
+        "_resolve_document_id",
+        "_build_insert_document",
+        "_build_bump_document",
+        "run_once",
+        "_process_one_case",
+        "run_all"
+      ],
+      "totalLines": 415,
+      "hasStructuralAnalysis": true
+    },
+    "pipeline/upstream.py": {
+      "filePath": "pipeline/upstream.py",
+      "contentHash": "f2848fa338ac5d4c927e342f326f0f2265107e0913f68d9ea0a3effcab2c0022",
+      "functions": [
+        {
+          "name": "_parse_success_list_response",
+          "params": [
+            "request_label",
+            "obj"
+          ],
+          "returnType": "list[Any]",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "_normalize_case_item",
+          "params": [
+            "item"
+          ],
+          "returnType": "dict[str, str]",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "fetch_all_kh_codes",
+          "params": [
+            "settings",
+            "client"
+          ],
+          "returnType": "list[str]",
+          "exported": true,
+          "lineCount": 53
+        },
+        {
+          "name": "fetch_cases",
+          "params": [
+            "kh_code",
+            "settings",
+            "client"
+          ],
+          "returnType": "list[dict[str, Any]]",
+          "exported": true,
+          "lineCount": 54
+        }
+      ],
+      "classes": [
+        {
+          "name": "UpstreamError",
+          "methods": [],
+          "properties": [],
+          "exported": true,
+          "lineCount": 2
+        }
+      ],
+      "imports": [
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any",
+            "Dict"
+          ]
+        },
+        {
+          "source": "httpx",
+          "specifiers": [
+            "httpx"
+          ]
+        },
+        {
+          "source": "..config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        }
+      ],
+      "exports": [
+        "UpstreamError",
+        "_parse_success_list_response",
+        "_normalize_case_item",
+        "fetch_all_kh_codes",
+        "fetch_cases"
+      ],
+      "totalLines": 180,
+      "hasStructuralAnalysis": true
+    },
+    "pyproject.toml": {
+      "filePath": "pyproject.toml",
+      "contentHash": "99e135b126c0932b32c01c0d1bb9142295ed399869f85ebc388744362927a1ab",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 5,
+      "hasStructuralAnalysis": true
+    },
+    "README.md": {
+      "filePath": "README.md",
+      "contentHash": "ede0e5e4c2648dc4686f1fee22a31aa0148ca705bbd43577aef7f2d5be19e7b4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 131,
+      "hasStructuralAnalysis": true
+    },
+    "requirements.txt": {
+      "filePath": "requirements.txt",
+      "contentHash": "c9eaf87b51fa3776322d1e6cab2e8b73d980025b110e7f1afe54a9e8df196047",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 12,
+      "hasStructuralAnalysis": false
+    },
+    "scheduler.py": {
+      "filePath": "scheduler.py",
+      "contentHash": "024207b32019f4f247cbe9bdfb0f5d239b8bd7dc2f3f92ed9da8704ab85008ec",
+      "functions": [
+        {
+          "name": "_scheduled_tick",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "trigger_kh_code",
+          "params": [
+            "kh_code"
+          ],
+          "returnType": "RunSummary",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "trigger_all",
+          "params": [],
+          "returnType": "list[RunSummary]",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "build_scheduler",
+          "params": [
+            "settings"
+          ],
+          "returnType": "AsyncIOScheduler",
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "mark_scheduler_started",
+          "params": [
+            "settings"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "status_snapshot",
+          "params": [],
+          "returnType": "dict[str, Any]",
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any"
+          ]
+        },
+        {
+          "source": "apscheduler.schedulers.asyncio",
+          "specifiers": [
+            "AsyncIOScheduler"
+          ]
+        },
+        {
+          "source": ".config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": ".pipeline.runner",
+          "specifiers": [
+            "RunSummary",
+            "run_all",
+            "run_once"
+          ]
+        }
+      ],
+      "exports": [
+        "_scheduled_tick",
+        "trigger_kh_code",
+        "trigger_all",
+        "build_scheduler",
+        "mark_scheduler_started",
+        "status_snapshot"
+      ],
+      "totalLines": 137,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/case_polarity_stats.md": {
+      "filePath": "scripts/case_polarity_stats.md",
+      "contentHash": "d4a5f6fdeada8c7e02a03f15d0deb18003a269236f2443a0d88da8f58e8ec193",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 48,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/prompts_test_results.md": {
+      "filePath": "scripts/prompts_test_results.md",
+      "contentHash": "44db2631f3f930983257aecfe5fe80a2981034b5b06a0e319714ab11952eccc1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 515,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/refresh_case_refined.py": {
+      "filePath": "scripts/refresh_case_refined.py",
+      "contentHash": "947e96b2af2c677c255f6db701e25a8872f68df32a10efd959f3faa943720067",
+      "functions": [
+        {
+          "name": "_cutoff_ms",
+          "params": [
+            "cutoff",
+            "end_of_day"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "_parse_cutoff",
+          "params": [
+            "raw"
+          ],
+          "returnType": "date",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "_parse_kh_codes",
+          "params": [
+            "raw"
+          ],
+          "returnType": "set[str] | None",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "_coerce_int",
+          "params": [
+            "v",
+            "default"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "_match_date_filter",
+          "params": [
+            "ts_ms",
+            "cutoff_ms",
+            "date_op"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "list_case_collections",
+          "params": [
+            "cli",
+            "settings",
+            "kh_filter"
+          ],
+          "returnType": "list[tuple[str, str]]",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "fetch_documents_for_export",
+          "params": [
+            "cli",
+            "kh_code",
+            "collection_id",
+            "page_size",
+            "cutoff_ms",
+            "date_op",
+            "date_field",
+            "only_refined"
+          ],
+          "returnType": "list[ExportRow]",
+          "exported": true,
+          "lineCount": 80
+        },
+        {
+          "name": "_sanitize_xlsx_value",
+          "params": [
+            "v"
+          ],
+          "returnType": "Any",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "_require_openpyxl",
+          "params": [],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "write_xlsx",
+          "params": [
+            "path",
+            "rows"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "read_xlsx",
+          "params": [
+            "path"
+          ],
+          "returnType": "list[dict[str, Any]]",
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "_row_to_case",
+          "params": [
+            "row"
+          ],
+          "returnType": "CaseDict",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "cmd_export",
+          "params": [
+            "args",
+            "settings"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 45
+        },
+        {
+          "name": "_refine_one_row",
+          "params": [
+            "row",
+            "settings",
+            "sem"
+          ],
+          "returnType": "dict[str, Any]",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "_refine_one_row_indexed",
+          "params": [
+            "idx",
+            "row",
+            "settings",
+            "sem"
+          ],
+          "returnType": "tuple[int, dict[str, Any]]",
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "_flush_logs",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "cmd_refine",
+          "params": [
+            "args",
+            "settings"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 73
+        },
+        {
+          "name": "_build_upload_merge_document",
+          "params": [
+            "row"
+          ],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "cmd_upload",
+          "params": [
+            "args",
+            "settings"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 81
+        },
+        {
+          "name": "build_parser",
+          "params": [],
+          "returnType": "argparse.ArgumentParser",
+          "exported": true,
+          "lineCount": 87
+        },
+        {
+          "name": "async_main",
+          "params": [
+            "argv"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 22
+        },
+        {
+          "name": "main",
+          "params": [
+            "argv"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 2
+        }
+      ],
+      "classes": [
+        {
+          "name": "ExportRow",
+          "methods": [
+            "as_xlsx_dict"
+          ],
+          "properties": [
+            "kh_code",
+            "document_id",
+            "collection_id",
+            "case",
+            "case_polarity",
+            "record_hash",
+            "question_hash",
+            "refine_status",
+            "refine_attempts",
+            "refined_at",
+            "ingest_ts",
+            "refined_knowledge"
+          ],
+          "exported": true,
+          "lineCount": 39
+        },
+        {
+          "name": "_FlushingStreamHandler",
+          "methods": [
+            "emit"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "imports": [
+        {
+          "source": "argparse",
+          "specifiers": [
+            "argparse"
+          ]
+        },
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "re",
+          "specifiers": [
+            "re"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass"
+          ]
+        },
+        {
+          "source": "datetime",
+          "specifiers": [
+            "date",
+            "datetime"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any",
+            "Literal"
+          ]
+        },
+        {
+          "source": "zoneinfo",
+          "specifiers": [
+            "ZoneInfo"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "classifier",
+            "refiner"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.lancedb_client",
+          "specifiers": [
+            "LanceDBError",
+            "LanceDBV2Client",
+            "_coerce_lance_document_id"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.runner",
+          "specifiers": [
+            "_now_ms"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.upstream",
+          "specifiers": [
+            "CaseDict"
+          ]
+        }
+      ],
+      "exports": [
+        "_cutoff_ms",
+        "_parse_cutoff",
+        "_parse_kh_codes",
+        "_coerce_int",
+        "_match_date_filter",
+        "list_case_collections",
+        "ExportRow",
+        "fetch_documents_for_export",
+        "_sanitize_xlsx_value",
+        "_require_openpyxl",
+        "write_xlsx",
+        "read_xlsx",
+        "_row_to_case",
+        "cmd_export",
+        "_refine_one_row",
+        "_refine_one_row_indexed",
+        "_flush_logs",
+        "cmd_refine",
+        "_build_upload_merge_document",
+        "cmd_upload",
+        "build_parser",
+        "_FlushingStreamHandler",
+        "async_main",
+        "main"
+      ],
+      "totalLines": 769,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/stats_case_polarity.py": {
+      "filePath": "scripts/stats_case_polarity.py",
+      "contentHash": "14adfb47ea4cb6430c5ffdfb24b67ebe7ab44afeba3881c48f11a541c063e44e",
+      "functions": [
+        {
+          "name": "_pct",
+          "params": [
+            "n",
+            "total"
+          ],
+          "returnType": "float",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "_fmt_pct",
+          "params": [
+            "n",
+            "total"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "_parse_kh_codes",
+          "params": [
+            "raw"
+          ],
+          "returnType": "set[str] | None",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "list_case_collections",
+          "params": [
+            "cli",
+            "settings",
+            "kh_filter"
+          ],
+          "returnType": "list[tuple[str, str, int | None]]",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "count_collection_polarities",
+          "params": [
+            "cli",
+            "collection_id",
+            "page_size"
+          ],
+          "returnType": "tuple[int, int, int, int, int]",
+          "exported": true,
+          "lineCount": 50
+        },
+        {
+          "name": "collect_stats",
+          "params": [
+            "cli",
+            "settings",
+            "kh_filter"
+          ],
+          "returnType": "list[CollectionPolarityStats]",
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "render_markdown",
+          "params": [
+            "stats",
+            "settings",
+            "generated_at"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 63
+        },
+        {
+          "name": "run",
+          "params": [
+            "args"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "build_parser",
+          "params": [],
+          "returnType": "argparse.ArgumentParser",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "main",
+          "params": [
+            "argv"
+          ],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "classes": [
+        {
+          "name": "CollectionPolarityStats",
+          "methods": [
+            "positive_pct",
+            "negative_pct"
+          ],
+          "properties": [
+            "kh_code",
+            "collection_id",
+            "n_documents_meta",
+            "total_active",
+            "positive",
+            "negative",
+            "unknown",
+            "tombstoned"
+          ],
+          "exported": true,
+          "lineCount": 17
+        }
+      ],
+      "imports": [
+        {
+          "source": "argparse",
+          "specifiers": [
+            "argparse"
+          ]
+        },
+        {
+          "source": "asyncio",
+          "specifiers": [
+            "asyncio"
+          ]
+        },
+        {
+          "source": "logging",
+          "specifiers": [
+            "logging"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass"
+          ]
+        },
+        {
+          "source": "datetime",
+          "specifiers": [
+            "datetime",
+            "timezone"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings",
+            "get_settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.lancedb_client",
+          "specifiers": [
+            "LanceDBError",
+            "LanceDBV2Client"
+          ]
+        }
+      ],
+      "exports": [
+        "CollectionPolarityStats",
+        "_pct",
+        "_fmt_pct",
+        "_parse_kh_codes",
+        "list_case_collections",
+        "count_collection_polarities",
+        "collect_stats",
+        "render_markdown",
+        "run",
+        "build_parser",
+        "main"
+      ],
+      "totalLines": 322,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/test_prompts.py": {
+      "filePath": "scripts/test_prompts.py",
+      "contentHash": "47026585cf7a284443be4f43c46c39a0bfcace172123024a9275082446560f7b",
+      "functions": [
+        {
+          "name": "_run_prompt",
+          "params": [
+            "label",
+            "system",
+            "user",
+            "settings"
+          ],
+          "returnType": "dict",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "_section",
+          "params": [
+            "title",
+            "body"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "build_report",
+          "params": [
+            "pos_result",
+            "neg_result",
+            "settings"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 81
+        },
+        {
+          "name": "main",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "datetime",
+          "specifiers": [
+            "datetime",
+            "timezone"
+          ]
+        },
+        {
+          "source": "pathlib",
+          "specifiers": [
+            "Path"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "get_settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "prompts"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.refiner",
+          "specifiers": [
+            "_clean_llm_output"
+          ]
+        },
+        {
+          "source": "case_refinery.vendor.llm_client",
+          "specifiers": [
+            "llm_chat"
+          ]
+        }
+      ],
+      "exports": [
+        "_run_prompt",
+        "_section",
+        "build_report",
+        "main"
+      ],
+      "totalLines": 212,
+      "hasStructuralAnalysis": true
+    },
+    "tests/__init__.py": {
+      "filePath": "tests/__init__.py",
+      "contentHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1,
+      "hasStructuralAnalysis": true
+    },
+    "tests/conftest.py": {
+      "filePath": "tests/conftest.py",
+      "contentHash": "0348086a18489bd01694475769d4dc50f7cd27ee5890465904af705937e830f1",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 19,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_app_cli.py": {
+      "filePath": "tests/test_app_cli.py",
+      "contentHash": "fe1b855bd7f64f8d88b3d30e05adb3f362c3192509498d964cec0ff3dbf30f7a",
+      "functions": [
+        {
+          "name": "_preserve_env",
+          "params": [
+            "key"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "test_apply_cli_overrides_schedule_interval_seconds",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "test_apply_cli_overrides_reject_negative",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "contextlib",
+          "specifiers": [
+            "contextmanager"
+          ]
+        },
+        {
+          "source": "pytest",
+          "specifiers": [
+            "pytest"
+          ]
+        },
+        {
+          "source": "case_refinery",
+          "specifiers": [
+            "app"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings",
+            "get_settings",
+            "set_settings"
+          ]
+        }
+      ],
+      "exports": [
+        "_preserve_env",
+        "test_apply_cli_overrides_schedule_interval_seconds",
+        "test_apply_cli_overrides_reject_negative"
+      ],
+      "totalLines": 39,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_classifier.py": {
+      "filePath": "tests/test_classifier.py",
+      "contentHash": "cd0933cc9867cf78ae4162839d8beb13b5367b7abf493dcaa7e89006198b647a",
+      "functions": [
+        {
+          "name": "test_classify_positive_when_both_unchanged",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "test_classify_negative_when_answer_changed",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "test_classify_negative_when_only_thinking_changed",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "test_record_hash_stable_across_field_order",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "test_record_hash_changes_when_any_field_changes",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "test_question_hash_only_depends_on_question",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "classifier"
+          ]
+        }
+      ],
+      "exports": [
+        "test_classify_positive_when_both_unchanged",
+        "test_classify_negative_when_answer_changed",
+        "test_classify_negative_when_only_thinking_changed",
+        "test_record_hash_stable_across_field_order",
+        "test_record_hash_changes_when_any_field_changes",
+        "test_question_hash_only_depends_on_question"
+      ],
+      "totalLines": 66,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_dedupe.py": {
+      "filePath": "tests/test_dedupe.py",
+      "contentHash": "27f62e02c13a0eebae3fe22f5c19c9a4c501781c1759032f13c01c24ac0ccb8f",
+      "functions": [
+        {
+          "name": "_index",
+          "params": [],
+          "returnType": "ExistingIndex",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "test_new_case_need_refine_and_insert_both_paths",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "test_hash_match_refined_is_skipped",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "test_raw_fallback_within_limit_triggers_overwrite_or_bump",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "test_raw_fallback_at_max_attempts_is_skipped",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "test_same_question_other_record_hash_listed_as_tombstone_victim",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "test_overwrite_raw_fallback_does_not_tombstone_self",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 30
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "dedupe"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.lancedb_client",
+          "specifiers": [
+            "ExistingDoc",
+            "ExistingIndex"
+          ]
+        }
+      ],
+      "exports": [
+        "_index",
+        "test_new_case_need_refine_and_insert_both_paths",
+        "test_hash_match_refined_is_skipped",
+        "test_raw_fallback_within_limit_triggers_overwrite_or_bump",
+        "test_raw_fallback_at_max_attempts_is_skipped",
+        "test_same_question_other_record_hash_listed_as_tombstone_victim",
+        "test_overwrite_raw_fallback_does_not_tombstone_self"
+      ],
+      "totalLines": 151,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_lancedb_client.py": {
+      "filePath": "tests/test_lancedb_client.py",
+      "contentHash": "e31d729cfa4e5cf983d80445100fc02fa81aab0a10f777cb3044ab3742326d4c",
+      "functions": [
+        {
+          "name": "_resp",
+          "params": [
+            "status_code",
+            "body"
+          ],
+          "returnType": "httpx.Response",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "test_request_retries_on_timeout_then_success",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "test_request_retries_on_5xx_then_raises",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 29
+        },
+        {
+          "name": "test_request_does_not_retry_on_4xx",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 29
+        }
+      ],
+      "classes": [
+        {
+          "name": "_SequencedClient",
+          "methods": [
+            "__init__",
+            "request"
+          ],
+          "properties": [],
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "imports": [
+        {
+          "source": "httpx",
+          "specifiers": [
+            "httpx"
+          ]
+        },
+        {
+          "source": "pytest",
+          "specifiers": [
+            "pytest"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "lancedb_client"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.lancedb_client",
+          "specifiers": [
+            "LanceDBError",
+            "LanceDBV2Client"
+          ]
+        }
+      ],
+      "exports": [
+        "_SequencedClient",
+        "_resp",
+        "test_request_retries_on_timeout_then_success",
+        "test_request_retries_on_5xx_then_raises",
+        "test_request_does_not_retry_on_4xx"
+      ],
+      "totalLines": 128,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_runner_mock.py": {
+      "filePath": "tests/test_runner_mock.py",
+      "contentHash": "51f7b8d070b9f667f3cc2b8a07841afca1e20f826b6e4987648abab5cbab85d4",
+      "functions": [
+        {
+          "name": "_settings_for_tests",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "_make_case",
+          "params": [
+            "q",
+            "expert_revised"
+          ],
+          "returnType": "dict[str, str]",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "_patch_fetch_cases",
+          "params": [
+            "monkeypatch",
+            "cases",
+            "raise_exc"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "_patch_fetch_all_kh_codes",
+          "params": [
+            "monkeypatch",
+            "kh_codes"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "_patch_refine",
+          "params": [
+            "monkeypatch",
+            "ok",
+            "text"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "_patch_embed",
+          "params": [
+            "monkeypatch",
+            "vector"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "test_upstream_empty_no_op",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "test_upstream_error_aborts_run",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 10
+        },
+        {
+          "name": "test_new_case_refine_success",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 20
+        },
+        {
+          "name": "test_new_case_refine_failure",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "test_existing_refined_skips",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "test_raw_fallback_overwrite_success",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 34
+        },
+        {
+          "name": "test_raw_fallback_bump_attempts",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "test_same_question_revision_tombstones_old_version",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 38
+        },
+        {
+          "name": "test_run_all_uses_list_all_kh",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "test_run_all_when_list_all_fails_returns_empty",
+          "params": [
+            "monkeypatch"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "classes": [
+        {
+          "name": "FakeLanceClient",
+          "methods": [
+            "list_existing",
+            "upsert_one",
+            "tombstone_docs",
+            "aclose"
+          ],
+          "properties": [
+            "existing",
+            "upserts",
+            "tombstoned"
+          ],
+          "exported": true,
+          "lineCount": 24
+        }
+      ],
+      "imports": [
+        {
+          "source": "dataclasses",
+          "specifiers": [
+            "dataclass",
+            "field"
+          ]
+        },
+        {
+          "source": "typing",
+          "specifiers": [
+            "Any"
+          ]
+        },
+        {
+          "source": "pytest",
+          "specifiers": [
+            "pytest"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings",
+            "set_settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline",
+          "specifiers": [
+            "embedder",
+            "refiner",
+            "runner"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.lancedb_client",
+          "specifiers": [
+            "ExistingDoc",
+            "ExistingIndex",
+            "LanceDBV2Client"
+          ]
+        }
+      ],
+      "exports": [
+        "FakeLanceClient",
+        "_settings_for_tests",
+        "_make_case",
+        "_patch_fetch_cases",
+        "_patch_fetch_all_kh_codes",
+        "_patch_refine",
+        "_patch_embed",
+        "test_upstream_empty_no_op",
+        "test_upstream_error_aborts_run",
+        "test_new_case_refine_success",
+        "test_new_case_refine_failure",
+        "test_existing_refined_skips",
+        "test_raw_fallback_overwrite_success",
+        "test_raw_fallback_bump_attempts",
+        "test_same_question_revision_tombstones_old_version",
+        "test_run_all_uses_list_all_kh",
+        "test_run_all_when_list_all_fails_returns_empty"
+      ],
+      "totalLines": 399,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_upstream.py": {
+      "filePath": "tests/test_upstream.py",
+      "contentHash": "a2117585f7f9f77a3b9c99fc5a4614dbf67527495ce945069bab307c080fc2fc",
+      "functions": [
+        {
+          "name": "_settings",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "test_fetch_all_kh_codes_success",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 28
+        },
+        {
+          "name": "test_fetch_cases_success_and_only_required_fields",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 37
+        },
+        {
+          "name": "test_fetch_all_kh_codes_fail_raises",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "test_fetch_cases_http_error_raises",
+          "params": [],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 16
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "pytest",
+          "specifiers": [
+            "pytest"
+          ]
+        },
+        {
+          "source": "case_refinery.config",
+          "specifiers": [
+            "Settings",
+            "set_settings"
+          ]
+        },
+        {
+          "source": "case_refinery.pipeline.upstream",
+          "specifiers": [
+            "UpstreamError",
+            "fetch_all_kh_codes",
+            "fetch_cases"
+          ]
+        }
+      ],
+      "exports": [
+        "_settings",
+        "test_fetch_all_kh_codes_success",
+        "test_fetch_cases_success_and_only_required_fields",
+        "test_fetch_all_kh_codes_fail_raises",
+        "test_fetch_cases_http_error_raises"
+      ],
+      "totalLines": 130,
+      "hasStructuralAnalysis": true
+    }
+  }
+}

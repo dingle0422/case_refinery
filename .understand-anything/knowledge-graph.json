@@ -1,0 +1,3532 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "case_refinery",
+    "languages": [
+      "json",
+      "markdown",
+      "python",
+      "toml",
+      "txt",
+      "unknown",
+      "xlsx"
+    ],
+    "frameworks": [
+      "FastAPI",
+      "uvicorn",
+      "APScheduler",
+      "pydantic",
+      "pytest",
+      "httpx"
+    ],
+    "description": "A standalone offline service that periodically fetches all khCodes from upstream, pulls case corpus data per khCode, refines positive/negative samples via LLM, and writes results to LanceDB v2 collections for online retrieval by the page-know-how inference service.",
+    "analyzedAt": "2026-06-05T05:26:43.412710+00:00",
+    "gitCommitHash": "2153268df59ce83bc9448ecfff13743ff8e20627"
+  },
+  "nodes": [
+    {
+      "id": "file:pipeline/classifier.py",
+      "type": "file",
+      "name": "classifier.py",
+      "filePath": "pipeline/classifier.py",
+      "summary": "Determines case polarity (positive vs negative) by comparing original and revised answer fields, and computes SHA-256 hashes for full-record deduplication and question-level versioning.",
+      "tags": [
+        "utility",
+        "validation",
+        "data-model",
+        "deduplication",
+        "tested"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Uses CaseDict type alias from upstream for typed dict access without a runtime model."
+    },
+    {
+      "id": "function:pipeline/classifier.py:classify",
+      "type": "function",
+      "name": "classify",
+      "filePath": "pipeline/classifier.py",
+      "lineRange": [
+        26,
+        33
+      ],
+      "summary": "Classifies a case as positive when original and revised answer/thinking fields match, otherwise negative (expert-revised).",
+      "tags": [
+        "validation",
+        "classification",
+        "polarity"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/classifier.py:record_hash",
+      "type": "function",
+      "name": "record_hash",
+      "filePath": "pipeline/classifier.py",
+      "lineRange": [
+        40,
+        56
+      ],
+      "summary": "Produces a stable SHA-256 hash over five canonical case fields using sorted JSON for cross-process deduplication.",
+      "tags": [
+        "utility",
+        "hashing",
+        "deduplication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/classifier.py:question_hash",
+      "type": "function",
+      "name": "question_hash",
+      "filePath": "pipeline/classifier.py",
+      "lineRange": [
+        59,
+        63
+      ],
+      "summary": "Hashes questionContent alone so LanceDB can filter and tombstone prior versions of the same question efficiently.",
+      "tags": [
+        "utility",
+        "hashing",
+        "versioning"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:pipeline/embedder.py",
+      "type": "file",
+      "name": "embedder.py",
+      "filePath": "pipeline/embedder.py",
+      "summary": "Async wrapper around the synchronous embedding vendor client, offloading blocking calls via asyncio.to_thread for use in the ingestion pipeline.",
+      "tags": [
+        "service",
+        "embedding",
+        "async"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/embedder.py:embed_question_content",
+      "type": "function",
+      "name": "embed_question_content",
+      "filePath": "pipeline/embedder.py",
+      "lineRange": [
+        21,
+        39
+      ],
+      "summary": "Embeds question text into a float vector using configured embedding API settings, raising EmbedError on failure.",
+      "tags": [
+        "embedding",
+        "async",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:pipeline/prompts.py",
+      "type": "file",
+      "name": "prompts.py",
+      "filePath": "pipeline/prompts.py",
+      "summary": "Defines LLM system and user prompt templates for refining positive (expert-approved) and negative (expert-revised) fiscal case samples into structured Markdown knowledge.",
+      "tags": [
+        "prompt-engineering",
+        "llm",
+        "template"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/prompts.py:render_positive",
+      "type": "function",
+      "name": "render_positive",
+      "filePath": "pipeline/prompts.py",
+      "lineRange": [
+        85,
+        94
+      ],
+      "summary": "Renders system and user prompts for positive cases, instructing the LLM to distill approved Q&A into three-part fiscal case knowledge.",
+      "tags": [
+        "prompt-engineering",
+        "template",
+        "positive-sample"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/prompts.py:render_negative",
+      "type": "function",
+      "name": "render_negative",
+      "filePath": "pipeline/prompts.py",
+      "lineRange": [
+        97,
+        108
+      ],
+      "summary": "Renders system and user prompts for negative cases, focusing on correct reasoning paths without exposing that the original answer was wrong.",
+      "tags": [
+        "prompt-engineering",
+        "template",
+        "negative-sample"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:pipeline/refiner.py",
+      "type": "file",
+      "name": "refiner.py",
+      "filePath": "pipeline/refiner.py",
+      "summary": "Invokes the LLM to refine case samples per polarity, cleans thinking-block artifacts from output, and returns a RefineResult indicating success or raw-fallback failure.",
+      "tags": [
+        "llm",
+        "service",
+        "refinement"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:pipeline/refiner.py:RefineResult",
+      "type": "class",
+      "name": "RefineResult",
+      "filePath": "pipeline/refiner.py",
+      "lineRange": [
+        35,
+        38
+      ],
+      "summary": "Frozen dataclass carrying refine outcome: success flag, cleaned knowledge text, or error reason for downstream dedupe decisions.",
+      "tags": [
+        "data-model",
+        "result-type"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/refiner.py:_clean_llm_output",
+      "type": "function",
+      "name": "_clean_llm_output",
+      "filePath": "pipeline/refiner.py",
+      "lineRange": [
+        49,
+        58
+      ],
+      "summary": "Strips redacted thinking blocks and whitespace from raw LLM output before length validation.",
+      "tags": [
+        "utility",
+        "sanitization",
+        "llm"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/refiner.py:refine",
+      "type": "function",
+      "name": "refine",
+      "filePath": "pipeline/refiner.py",
+      "lineRange": [
+        61,
+        99
+      ],
+      "summary": "Runs a single LLM refine call for a case and polarity, validates cleaned output length, and returns RefineResult for the runner to persist or fall back.",
+      "tags": [
+        "llm",
+        "refinement",
+        "async",
+        "service"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:pipeline/runner.py",
+      "type": "file",
+      "name": "runner.py",
+      "filePath": "pipeline/runner.py",
+      "summary": "Orchestrates the full case ingestion pipeline: upstream fetch, dedupe decisions, LLM refine, embedding, LanceDB upsert, and tombstoning of superseded question versions.",
+      "tags": [
+        "entry-point",
+        "orchestration",
+        "pipeline",
+        "service",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:pipeline/runner.py:RunSummary",
+      "type": "class",
+      "name": "RunSummary",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        38,
+        70
+      ],
+      "summary": "Mutable dataclass aggregating per-khCode run metrics including inserts, skips, tombstones, errors, and abort reason.",
+      "tags": [
+        "data-model",
+        "metrics",
+        "reporting"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/runner.py:as_dict",
+      "type": "function",
+      "name": "as_dict",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        52,
+        70
+      ],
+      "summary": "Serializes RunSummary to a plain dict with elapsed_ms computed from start and finish timestamps.",
+      "tags": [
+        "serialization",
+        "reporting"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/runner.py:_resolve_document_id",
+      "type": "function",
+      "name": "_resolve_document_id",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        84,
+        97
+      ],
+      "summary": "Resolves LanceDB document_id as a positive integer, deriving stable IDs from record_hash for new docs or reusing existing stored IDs.",
+      "tags": [
+        "utility",
+        "identifier",
+        "lancedb"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/runner.py:_build_insert_document",
+      "type": "function",
+      "name": "_build_insert_document",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        100,
+        152
+      ],
+      "summary": "Constructs a full LanceDB document payload for a new or overwritten case including vectors, refine metadata, and upstream field snapshots.",
+      "tags": [
+        "serialization",
+        "lancedb",
+        "document-builder"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/runner.py:_build_bump_document",
+      "type": "function",
+      "name": "_build_bump_document",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        155,
+        185
+      ],
+      "summary": "Builds a minimal document update that increments refine_attempts and refreshes timestamps without changing stored knowledge content.",
+      "tags": [
+        "serialization",
+        "lancedb",
+        "retry"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/runner.py:run_once",
+      "type": "function",
+      "name": "run_once",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        188,
+        245
+      ],
+      "summary": "Executes one ingestion round for a single khCode: fetches cases, loads existing LanceDB index, processes each case with error isolation, and returns RunSummary.",
+      "tags": [
+        "orchestration",
+        "entry-point",
+        "pipeline"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:pipeline/runner.py:_process_one_case",
+      "type": "function",
+      "name": "_process_one_case",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        248,
+        386
+      ],
+      "summary": "Handles a single raw case through classify, dedupe, optional refine, embedding, upsert, and tombstone steps according to the dedupe decision table.",
+      "tags": [
+        "orchestration",
+        "pipeline",
+        "case-processing"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:pipeline/runner.py:run_all",
+      "type": "function",
+      "name": "run_all",
+      "filePath": "pipeline/runner.py",
+      "lineRange": [
+        389,
+        414
+      ],
+      "summary": "Fetches all khCodes from upstream and runs run_once sequentially for each, sharing a LanceDB client across the batch.",
+      "tags": [
+        "orchestration",
+        "entry-point",
+        "batch"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:pipeline/upstream.py",
+      "type": "file",
+      "name": "upstream.py",
+      "filePath": "pipeline/upstream.py",
+      "summary": "HTTP client for upstream kh APIs that lists all khCodes and fetches normalized five-field case corpus records per khCode.",
+      "tags": [
+        "api-client",
+        "upstream",
+        "data-fetch",
+        "tested"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/upstream.py:_parse_success_list_response",
+      "type": "function",
+      "name": "_parse_success_list_response",
+      "filePath": "pipeline/upstream.py",
+      "lineRange": [
+        39,
+        57
+      ],
+      "summary": "Validates upstream {success, data} JSON responses and extracts the data list, raising UpstreamError on malformed or failed responses.",
+      "tags": [
+        "validation",
+        "parsing",
+        "error-handling"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/upstream.py:_normalize_case_item",
+      "type": "function",
+      "name": "_normalize_case_item",
+      "filePath": "pipeline/upstream.py",
+      "lineRange": [
+        60,
+        68
+      ],
+      "summary": "Extracts and string-normalizes the five required case fields from a raw upstream corpus item.",
+      "tags": [
+        "normalization",
+        "data-model"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "type": "function",
+      "name": "fetch_all_kh_codes",
+      "filePath": "pipeline/upstream.py",
+      "lineRange": [
+        71,
+        123
+      ],
+      "summary": "POSTs to listAllKh, deduplicates returned khCode values, and returns the full code list for batch ingestion.",
+      "tags": [
+        "api-client",
+        "upstream",
+        "async"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/upstream.py:fetch_cases",
+      "type": "function",
+      "name": "fetch_cases",
+      "filePath": "pipeline/upstream.py",
+      "lineRange": [
+        126,
+        179
+      ],
+      "summary": "POSTs to listCorpusByKhCode for a given khCode and returns a list of normalized five-field CaseDict records.",
+      "tags": [
+        "api-client",
+        "upstream",
+        "async"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:api/routes.py",
+      "type": "file",
+      "name": "routes.py",
+      "filePath": "api/routes.py",
+      "summary": "FastAPI route handlers exposing health checks, scheduler status, and manual triggers to run the full or single-khCode refinement pipeline.",
+      "tags": [
+        "api-handler",
+        "fastapi",
+        "health-check",
+        "trigger-endpoints"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:app.py",
+      "type": "file",
+      "name": "app.py",
+      "filePath": "app.py",
+      "summary": "Application entry point that bootstraps FastAPI with lifespan hooks, wires LanceDB client and APScheduler, applies CLI overrides, and launches uvicorn.",
+      "tags": [
+        "entry-point",
+        "fastapi",
+        "lifespan",
+        "uvicorn",
+        "tested"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Uses FastAPI lifespan context manager to start and tear down the background scheduler on app startup/shutdown."
+    },
+    {
+      "id": "file:config.py",
+      "type": "file",
+      "name": "config.py",
+      "filePath": "config.py",
+      "summary": "Central configuration module defining a Settings dataclass and singleton accessors that load upstream, LanceDB, LLM, embedding, and scheduling parameters from environment variables.",
+      "tags": [
+        "config",
+        "environment",
+        "settings",
+        "singleton"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:scheduler.py",
+      "type": "file",
+      "name": "scheduler.py",
+      "filePath": "scheduler.py",
+      "summary": "APScheduler integration that runs periodic full-pipeline ticks and exposes on-demand triggers for all or single khCode refinement runs via the pipeline runner.",
+      "tags": [
+        "scheduler",
+        "background-jobs",
+        "trigger",
+        "service"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:api/routes.py:status",
+      "type": "function",
+      "name": "status",
+      "filePath": "api/routes.py",
+      "lineRange": [
+        34,
+        56
+      ],
+      "summary": "Returns a JSON snapshot of service settings, configured khCodes, schedule label, and current scheduler run state.",
+      "tags": [
+        "api-handler",
+        "status",
+        "monitoring"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:api/routes.py:trigger_one_route",
+      "type": "function",
+      "name": "trigger_one_route",
+      "filePath": "api/routes.py",
+      "lineRange": [
+        66,
+        70
+      ],
+      "summary": "HTTP endpoint that validates a khCode path parameter and synchronously triggers a single-khCode pipeline run.",
+      "tags": [
+        "api-handler",
+        "trigger",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:app.py:lifespan",
+      "type": "function",
+      "name": "lifespan",
+      "filePath": "app.py",
+      "lineRange": [
+        59,
+        90
+      ],
+      "summary": "FastAPI lifespan hook that configures logging, probes LanceDB capabilities, starts the background scheduler, and shuts it down on app exit.",
+      "tags": [
+        "lifespan",
+        "startup",
+        "shutdown",
+        "scheduler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app.py:_apply_cli_overrides",
+      "type": "function",
+      "name": "_apply_cli_overrides",
+      "filePath": "app.py",
+      "lineRange": [
+        97,
+        119
+      ],
+      "summary": "Parses optional CLI arguments to override the kh_codes settings list before the server starts.",
+      "tags": [
+        "cli",
+        "argument-parsing",
+        "config-override"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:app.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "app.py",
+      "lineRange": [
+        122,
+        135
+      ],
+      "summary": "Main entry function that applies CLI overrides and launches the FastAPI app via uvicorn with host, port, and reload settings from environment.",
+      "tags": [
+        "entry-point",
+        "uvicorn",
+        "cli"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:config.py:Settings",
+      "type": "class",
+      "name": "Settings",
+      "filePath": "config.py",
+      "lineRange": [
+        65,
+        181
+      ],
+      "summary": "Immutable dataclass holding all runtime configuration for upstream APIs, LanceDB, LLM refinement, embeddings, logging, and cron/interval scheduling.",
+      "tags": [
+        "config",
+        "dataclass",
+        "settings",
+        "environment"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:config.py:get_settings",
+      "type": "function",
+      "name": "get_settings",
+      "filePath": "config.py",
+      "lineRange": [
+        186,
+        191
+      ],
+      "summary": "Returns the process-wide cached Settings singleton, lazily initialized from environment on first access.",
+      "tags": [
+        "config",
+        "singleton",
+        "factory"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:config.py:set_settings",
+      "type": "function",
+      "name": "set_settings",
+      "filePath": "config.py",
+      "lineRange": [
+        194,
+        197
+      ],
+      "summary": "Replaces the global Settings singleton, used by CLI override logic to inject runtime configuration changes.",
+      "tags": [
+        "config",
+        "singleton",
+        "override"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:config.py:_env_float_compat",
+      "type": "function",
+      "name": "_env_float_compat",
+      "filePath": "config.py",
+      "lineRange": [
+        37,
+        47
+      ],
+      "summary": "Reads a float environment variable trying multiple key aliases for backward-compatible configuration naming.",
+      "tags": [
+        "utility",
+        "environment",
+        "parsing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scheduler.py:_scheduled_tick",
+      "type": "function",
+      "name": "_scheduled_tick",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        44,
+        60
+      ],
+      "summary": "Background job callback invoked on the configured cron or interval schedule to run the full refinement pipeline for all khCodes.",
+      "tags": [
+        "scheduler",
+        "background-job",
+        "pipeline-trigger"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scheduler.py:trigger_kh_code",
+      "type": "function",
+      "name": "trigger_kh_code",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        63,
+        69
+      ],
+      "summary": "Synchronously runs the refinement pipeline for a single khCode and returns the run summary as a dictionary.",
+      "tags": [
+        "trigger",
+        "pipeline",
+        "single-khcode"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scheduler.py:trigger_all",
+      "type": "function",
+      "name": "trigger_all",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        72,
+        82
+      ],
+      "summary": "Manually triggers a full pipeline run across all configured khCodes and records timing metadata in the returned summary.",
+      "tags": [
+        "trigger",
+        "pipeline",
+        "batch-run"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scheduler.py:build_scheduler",
+      "type": "function",
+      "name": "build_scheduler",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        85,
+        117
+      ],
+      "summary": "Constructs and configures an AsyncIOScheduler with cron, interval, or disabled jobs based on current Settings.",
+      "tags": [
+        "scheduler",
+        "factory",
+        "apscheduler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scheduler.py:mark_scheduler_started",
+      "type": "function",
+      "name": "mark_scheduler_started",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        120,
+        128
+      ],
+      "summary": "Updates in-memory scheduler state to reflect startup time, schedule label, and configured khCodes for status reporting.",
+      "tags": [
+        "scheduler",
+        "state",
+        "monitoring"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scheduler.py:status_snapshot",
+      "type": "function",
+      "name": "status_snapshot",
+      "filePath": "scheduler.py",
+      "lineRange": [
+        131,
+        136
+      ],
+      "summary": "Returns a copy of the current scheduler state including last run metadata and configured khCodes for the status API.",
+      "tags": [
+        "monitoring",
+        "status",
+        "snapshot"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/tmp/ua-import-map-input.json",
+      "type": "config",
+      "name": "ua-import-map-input.json",
+      "filePath": ".understand-anything/tmp/ua-import-map-input.json",
+      "summary": "Intermediate Understand-Anything artifact listing 39 project files with path, language, and fileCategory metadata used as input to the import-map resolver script.",
+      "tags": [
+        "configuration",
+        "code-analysis",
+        "import-graph",
+        "pipeline-artifact",
+        "metadata"
+      ],
+      "complexity": "simple",
+      "languageNotes": "JSON envelope with projectRoot and a flat files array consumed by the bundled import-map extractor."
+    },
+    {
+      "id": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "type": "config",
+      "name": "ua-import-map-output.json",
+      "filePath": ".understand-anything/tmp/ua-import-map-output.json",
+      "summary": "Resolved import dependency map for the case_refinery codebase, mapping each of 39 scanned files to its project-internal imports (23 edges across 10 files with imports).",
+      "tags": [
+        "configuration",
+        "import-graph",
+        "dependency-map",
+        "code-analysis",
+        "pipeline-artifact"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Output of the import-map script; importMap keys are relative paths and values are arrays of resolved internal import targets."
+    },
+    {
+      "id": "config:.understand-anything/tmp/ua-scan-files.json",
+      "type": "config",
+      "name": "ua-scan-files.json",
+      "filePath": ".understand-anything/tmp/ua-scan-files.json",
+      "summary": "Project scanner output cataloging 39 files with size, language, and category breakdowns, plus aggregate stats (29 code, 5 config, 5 docs files; moderate estimated complexity).",
+      "tags": [
+        "configuration",
+        "code-analysis",
+        "file-inventory",
+        "pipeline-artifact",
+        "metadata"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Rich per-file records with sizeLines and fileCategory, plus byCategory and byLanguage summary statistics."
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Primary project documentation for the Case Refinery offline service, covering architecture decoupling from page-know-how, end-to-end data flow, dedupe decision table, HTTP API endpoints, environment variable reference, directory layout, and local run/test instructions.",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "api-reference",
+        "configuration"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Bilingual headings (Chinese section titles) with ASCII data-flow diagram and markdown tables for dedupe rules and HTTP routes."
+    },
+    {
+      "id": "config:pyproject.toml",
+      "type": "config",
+      "name": "pyproject.toml",
+      "filePath": "pyproject.toml",
+      "summary": "Minimal pytest project configuration enabling asyncio auto mode, scoping discovery to the tests directory with quiet output and strict marker enforcement.",
+      "tags": [
+        "configuration",
+        "testing",
+        "pytest",
+        "build-system"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:requirements.txt",
+      "type": "document",
+      "name": "requirements.txt",
+      "filePath": "requirements.txt",
+      "summary": "Python dependency manifest pinning FastAPI, Uvicorn, APScheduler, HTTP clients, Pydantic, openpyxl, and pytest tooling required to run and test the service.",
+      "tags": [
+        "documentation",
+        "dependencies",
+        "python",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "__init__.py",
+      "summary": "Root package marker declaring case_refinery as an offline case-refinement service.",
+      "tags": [
+        "entry-point",
+        "package"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.DS_Store",
+      "type": "file",
+      "name": ".DS_Store",
+      "filePath": ".DS_Store",
+      "summary": "macOS Finder metadata file with no application role in the project.",
+      "tags": [
+        "metadata",
+        "artifact"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:.understand-anything/.understandignore",
+      "type": "file",
+      "name": ".understandignore",
+      "filePath": ".understand-anything/.understandignore",
+      "summary": "Ignore patterns for the Understand-Anything scanner excluding build artifacts and generated data.",
+      "tags": [
+        "configuration",
+        "scanner"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/intermediate/scan-result.json",
+      "type": "config",
+      "name": "scan-result.json",
+      "filePath": ".understand-anything/intermediate/scan-result.json",
+      "summary": "Project scan output listing files, languages, frameworks, import map, and complexity estimates for graph generation.",
+      "tags": [
+        "configuration",
+        "scanner",
+        "import-map"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:api/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "api/__init__.py",
+      "summary": "Empty API package initializer reserving the api namespace.",
+      "tags": [
+        "entry-point",
+        "package"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:data/case_refined_refresh.xlsx",
+      "type": "file",
+      "name": "case_refined_refresh.xlsx",
+      "filePath": "data/case_refined_refresh.xlsx",
+      "summary": "Large Excel workbook holding exported and LLM-refined case rows used as intermediate data for the refresh pipeline.",
+      "tags": [
+        "data-pipeline",
+        "export",
+        "xlsx"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/lancedb_v2_api.md",
+      "type": "document",
+      "name": "lancedb_v2_api.md",
+      "filePath": "docs/lancedb_v2_api.md",
+      "summary": "Comprehensive LanceDB Retrieval Service v2 API reference covering collections, documents, upsert, tombstone, and search endpoints.",
+      "tags": [
+        "documentation",
+        "api-schema",
+        "lancedb"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:pipeline/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "pipeline/__init__.py",
+      "summary": "Pipeline package initializer exposing the offline refinement workflow modules.",
+      "tags": [
+        "entry-point",
+        "package",
+        "pipeline"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:pipeline/dedupe.py",
+      "type": "file",
+      "name": "dedupe.py",
+      "filePath": "pipeline/dedupe.py",
+      "summary": "Dedup decision engine that compares record and question hashes against LanceDB state to decide refine, skip, overwrite, or tombstone actions.",
+      "tags": [
+        "deduplication",
+        "pipeline",
+        "decision-logic",
+        "tested"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:pipeline/lancedb_client.py",
+      "type": "file",
+      "name": "lancedb_client.py",
+      "filePath": "pipeline/lancedb_client.py",
+      "summary": "Async HTTP client for LanceDB v2 with retry logic, existing-document indexing, upsert, and tombstone operations.",
+      "tags": [
+        "lancedb",
+        "service",
+        "http-client",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:scripts/case_polarity_stats.md",
+      "type": "document",
+      "name": "case_polarity_stats.md",
+      "filePath": "scripts/case_polarity_stats.md",
+      "summary": "Generated markdown report summarizing positive/negative case polarity counts per khCode collection.",
+      "tags": [
+        "documentation",
+        "statistics",
+        "polarity"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:scripts/prompts_test_results.md",
+      "type": "document",
+      "name": "prompts_test_results.md",
+      "filePath": "scripts/prompts_test_results.md",
+      "summary": "LLM prompt smoke-test report capturing positive and negative refinement outputs and heuristic quality checks.",
+      "tags": [
+        "documentation",
+        "llm",
+        "prompt-testing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/refresh_case_refined.py",
+      "type": "file",
+      "name": "refresh_case_refined.py",
+      "filePath": "scripts/refresh_case_refined.py",
+      "summary": "CLI script orchestrating export, LLM refine, and upload stages for case_refined LanceDB collections via XLSX interchange.",
+      "tags": [
+        "entry-point",
+        "cli",
+        "data-pipeline"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:scripts/stats_case_polarity.py",
+      "type": "file",
+      "name": "stats_case_polarity.py",
+      "filePath": "scripts/stats_case_polarity.py",
+      "summary": "CLI utility that scans LanceDB case collections and renders positive/negative polarity statistics to markdown.",
+      "tags": [
+        "cli",
+        "statistics",
+        "reporting"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/test_prompts.py",
+      "type": "file",
+      "name": "test_prompts.py",
+      "filePath": "scripts/test_prompts.py",
+      "summary": "Manual prompt validation script that runs positive/negative LLM refinements and writes a markdown report.",
+      "tags": [
+        "llm",
+        "prompt-testing",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "tests/__init__.py",
+      "summary": "Empty test package initializer.",
+      "tags": [
+        "test",
+        "package"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/conftest.py",
+      "type": "file",
+      "name": "conftest.py",
+      "filePath": "tests/conftest.py",
+      "summary": "Pytest configuration adding the project root to sys.path for test imports.",
+      "tags": [
+        "test",
+        "pytest",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/test_app_cli.py",
+      "type": "file",
+      "name": "test_app_cli.py",
+      "filePath": "tests/test_app_cli.py",
+      "summary": "Tests for app CLI override logic validating schedule interval environment variable handling.",
+      "tags": [
+        "test",
+        "cli",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/test_classifier.py",
+      "type": "file",
+      "name": "test_classifier.py",
+      "filePath": "tests/test_classifier.py",
+      "summary": "Unit tests for case polarity classification and stable record/question hash computation.",
+      "tags": [
+        "test",
+        "classifier",
+        "hashing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/test_dedupe.py",
+      "type": "file",
+      "name": "test_dedupe.py",
+      "filePath": "tests/test_dedupe.py",
+      "summary": "Unit tests covering dedupe decision paths for new cases, refined skips, raw fallback, and tombstone victims.",
+      "tags": [
+        "test",
+        "deduplication",
+        "pipeline"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_lancedb_client.py",
+      "type": "file",
+      "name": "test_lancedb_client.py",
+      "filePath": "tests/test_lancedb_client.py",
+      "summary": "Tests for LanceDBV2Client HTTP retry behavior on timeouts, 5xx errors, and non-retryable 4xx responses.",
+      "tags": [
+        "test",
+        "lancedb",
+        "http-client"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:tests/test_runner_mock.py",
+      "type": "file",
+      "name": "test_runner_mock.py",
+      "filePath": "tests/test_runner_mock.py",
+      "summary": "Integration-style tests for the pipeline runner using mocked upstream, refine, embed, and LanceDB clients.",
+      "tags": [
+        "test",
+        "pipeline",
+        "integration"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:tests/test_upstream.py",
+      "type": "file",
+      "name": "test_upstream.py",
+      "filePath": "tests/test_upstream.py",
+      "summary": "Tests for upstream HTTP client methods fetching khCodes and case corpora with error handling.",
+      "tags": [
+        "test",
+        "upstream",
+        "http-client"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:pipeline/dedupe.py:Decision",
+      "type": "class",
+      "name": "Decision",
+      "filePath": "pipeline/dedupe.py",
+      "lineRange": [
+        36,
+        43
+      ],
+      "summary": "Dataclass capturing dedupe outcome flags, existing doc metadata, tombstone targets, and decision reason.",
+      "tags": [
+        "data-model",
+        "deduplication"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:pipeline/dedupe.py:_collect_tombstone_victims",
+      "type": "function",
+      "name": "_collect_tombstone_victims",
+      "filePath": "pipeline/dedupe.py",
+      "lineRange": [
+        46,
+        66
+      ],
+      "summary": "Collects same-question documents with differing record hashes that should be tombstoned when a new version is kept.",
+      "tags": [
+        "deduplication",
+        "tombstone"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:pipeline/dedupe.py:decide",
+      "type": "function",
+      "name": "decide",
+      "filePath": "pipeline/dedupe.py",
+      "lineRange": [
+        69,
+        125
+      ],
+      "summary": "Core dedupe entry point evaluating record hash matches, refine status, and attempt limits to return a Decision.",
+      "tags": [
+        "deduplication",
+        "decision-logic",
+        "pipeline"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:pipeline/lancedb_client.py:ExistingDoc",
+      "type": "class",
+      "name": "ExistingDoc",
+      "filePath": "pipeline/lancedb_client.py",
+      "lineRange": [
+        51,
+        59
+      ],
+      "summary": "Dataclass representing a single LanceDB document's dedupe-relevant metadata fields.",
+      "tags": [
+        "data-model",
+        "lancedb"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "class",
+      "name": "ExistingIndex",
+      "filePath": "pipeline/lancedb_client.py",
+      "lineRange": [
+        63,
+        76
+      ],
+      "summary": "In-memory index of existing documents keyed by record_hash and question_hash for fast dedupe lookups.",
+      "tags": [
+        "data-model",
+        "index",
+        "lancedb"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "class",
+      "name": "LanceDBV2Client",
+      "filePath": "pipeline/lancedb_client.py",
+      "lineRange": [
+        79,
+        363
+      ],
+      "summary": "Async LanceDB v2 HTTP client providing capabilities probe, collection listing, upsert, and tombstone with exponential retry.",
+      "tags": [
+        "service",
+        "http-client",
+        "lancedb"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:scripts/refresh_case_refined.py:ExportRow",
+      "type": "class",
+      "name": "ExportRow",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        168,
+        206
+      ],
+      "summary": "Dataclass holding exported case document fields with as_xlsx_dict serialization for spreadsheet interchange.",
+      "tags": [
+        "data-model",
+        "export",
+        "xlsx"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:fetch_documents_for_export",
+      "type": "function",
+      "name": "fetch_documents_for_export",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        209,
+        288
+      ],
+      "summary": "Paginates LanceDB documents for a collection, applies date filters, classifies polarity, and builds ExportRow list.",
+      "tags": [
+        "export",
+        "lancedb",
+        "pagination"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:cmd_export",
+      "type": "function",
+      "name": "cmd_export",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        360,
+        404
+      ],
+      "summary": "Export subcommand listing case collections and writing filtered documents to an XLSX workbook.",
+      "tags": [
+        "cli",
+        "export",
+        "xlsx"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:cmd_refine",
+      "type": "function",
+      "name": "cmd_refine",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        456,
+        528
+      ],
+      "summary": "Refine subcommand reading XLSX rows and running concurrent LLM refinements with progress logging.",
+      "tags": [
+        "cli",
+        "llm",
+        "refinement"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:cmd_upload",
+      "type": "function",
+      "name": "cmd_upload",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        559,
+        639
+      ],
+      "summary": "Upload subcommand merging successfully refined rows back into LanceDB via upsert with rate limiting.",
+      "tags": [
+        "cli",
+        "lancedb",
+        "upload"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:build_parser",
+      "type": "function",
+      "name": "build_parser",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        642,
+        728
+      ],
+      "summary": "Builds argparse CLI with export, refine, and upload subcommands and shared logging options.",
+      "tags": [
+        "cli",
+        "argparse",
+        "entry-point"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:async_main",
+      "type": "function",
+      "name": "async_main",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        739,
+        760
+      ],
+      "summary": "Async CLI dispatcher configuring logging and routing to export, refine, or upload handlers.",
+      "tags": [
+        "cli",
+        "entry-point",
+        "async"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/refresh_case_refined.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/refresh_case_refined.py",
+      "lineRange": [
+        763,
+        764
+      ],
+      "summary": "Synchronous entry point wrapping async_main with asyncio.run.",
+      "tags": [
+        "entry-point",
+        "cli"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:scripts/stats_case_polarity.py:CollectionPolarityStats",
+      "type": "class",
+      "name": "CollectionPolarityStats",
+      "filePath": "scripts/stats_case_polarity.py",
+      "lineRange": [
+        41,
+        57
+      ],
+      "summary": "Per-collection aggregate counts of positive, negative, unknown, and tombstoned documents with percentage helpers.",
+      "tags": [
+        "data-model",
+        "statistics",
+        "polarity"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/stats_case_polarity.py:collect_stats",
+      "type": "function",
+      "name": "collect_stats",
+      "filePath": "scripts/stats_case_polarity.py",
+      "lineRange": [
+        157,
+        190
+      ],
+      "summary": "Iterates case collections and gathers polarity statistics for each khCode.",
+      "tags": [
+        "statistics",
+        "lancedb",
+        "aggregation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/stats_case_polarity.py:render_markdown",
+      "type": "function",
+      "name": "render_markdown",
+      "filePath": "scripts/stats_case_polarity.py",
+      "lineRange": [
+        193,
+        255
+      ],
+      "summary": "Formats collected polarity stats into a markdown table with per-collection and global summaries.",
+      "tags": [
+        "reporting",
+        "markdown",
+        "statistics"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/stats_case_polarity.py:run",
+      "type": "function",
+      "name": "run",
+      "filePath": "scripts/stats_case_polarity.py",
+      "lineRange": [
+        258,
+        281
+      ],
+      "summary": "Async orchestrator connecting to LanceDB, collecting stats, and writing the markdown report file.",
+      "tags": [
+        "cli",
+        "orchestration",
+        "statistics"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/stats_case_polarity.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/stats_case_polarity.py",
+      "lineRange": [
+        307,
+        317
+      ],
+      "summary": "CLI entry point parsing arguments and invoking the async run function.",
+      "tags": [
+        "entry-point",
+        "cli"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/test_prompts.py:build_report",
+      "type": "function",
+      "name": "build_report",
+      "filePath": "scripts/test_prompts.py",
+      "lineRange": [
+        114,
+        194
+      ],
+      "summary": "Assembles a markdown report comparing positive and negative LLM refinement outputs with heuristic checks.",
+      "tags": [
+        "llm",
+        "reporting",
+        "prompt-testing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/test_prompts.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/test_prompts.py",
+      "lineRange": [
+        197,
+        207
+      ],
+      "summary": "Runs positive and negative prompt tests against the configured LLM and writes results to markdown.",
+      "tags": [
+        "entry-point",
+        "llm",
+        "prompt-testing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:tests/test_runner_mock.py:FakeLanceClient",
+      "type": "class",
+      "name": "FakeLanceClient",
+      "filePath": "tests/test_runner_mock.py",
+      "lineRange": [
+        32,
+        55
+      ],
+      "summary": "In-memory LanceDB client mock recording upserts and tombstones for pipeline runner integration tests.",
+      "tags": [
+        "test",
+        "mock",
+        "lancedb"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:vendor/llm_client.py",
+      "type": "file",
+      "name": "llm_client.py",
+      "filePath": "vendor/llm_client.py",
+      "summary": "Vendored LLM chat client copied from page-know-how, stripped of verbose logger dependencies while preserving retry behavior and OpenAI-compatible response handling.",
+      "tags": [
+        "vendor",
+        "service",
+        "llm"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Imports retry from vendor/utils_helpers.py; not included in project scan batches."
+    },
+    {
+      "id": "file:vendor/utils_helpers.py",
+      "type": "file",
+      "name": "utils_helpers.py",
+      "filePath": "vendor/utils_helpers.py",
+      "summary": "Vendored retry decorator copied from page-know-how utils/helpers.py, providing configurable retry with sleep between attempts.",
+      "tags": [
+        "vendor",
+        "utility"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Standalone utility with no external dependencies beyond stdlib; not included in project scan batches."
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "file:pipeline/upstream.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/embedder.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "file:pipeline/prompts.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "file:pipeline/upstream.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/classifier.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/dedupe.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/embedder.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/refiner.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:pipeline/upstream.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:classify",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:record_hash",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:question_hash",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/embedder.py",
+      "target": "function:pipeline/embedder.py:embed_question_content",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/prompts.py",
+      "target": "function:pipeline/prompts.py:render_positive",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/prompts.py",
+      "target": "function:pipeline/prompts.py:render_negative",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "class:pipeline/refiner.py:RefineResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "function:pipeline/refiner.py:_clean_llm_output",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "function:pipeline/refiner.py:refine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "class:pipeline/runner.py:RunSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:as_dict",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_resolve_document_id",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_build_insert_document",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_build_bump_document",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:run_once",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_process_one_case",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:run_all",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:_parse_success_list_response",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:_normalize_case_item",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:fetch_cases",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "class:pipeline/runner.py:RunSummary",
+      "target": "function:pipeline/runner.py:as_dict",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:classify",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:record_hash",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "function:pipeline/classifier.py:question_hash",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/embedder.py",
+      "target": "function:pipeline/embedder.py:embed_question_content",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/prompts.py",
+      "target": "function:pipeline/prompts.py:render_positive",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/prompts.py",
+      "target": "function:pipeline/prompts.py:render_negative",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "class:pipeline/refiner.py:RefineResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "function:pipeline/refiner.py:_clean_llm_output",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/refiner.py",
+      "target": "function:pipeline/refiner.py:refine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "class:pipeline/runner.py:RunSummary",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_resolve_document_id",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_build_insert_document",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_build_bump_document",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:run_once",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:_process_one_case",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "function:pipeline/runner.py:run_all",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:_parse_success_list_response",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:_normalize_case_item",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "function:pipeline/upstream.py:fetch_cases",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/embedder.py:embed_question_content",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/refiner.py:refine",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/refiner.py:refine",
+      "target": "function:pipeline/prompts.py:render_positive",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/refiner.py:refine",
+      "target": "function:pipeline/prompts.py:render_negative",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/refiner.py:refine",
+      "target": "function:pipeline/refiner.py:_clean_llm_output",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "target": "function:pipeline/upstream.py:_parse_success_list_response",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/upstream.py:fetch_cases",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/upstream.py:fetch_cases",
+      "target": "function:pipeline/upstream.py:_parse_success_list_response",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/upstream.py:fetch_cases",
+      "target": "function:pipeline/upstream.py:_normalize_case_item",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_build_insert_document",
+      "target": "function:pipeline/runner.py:_resolve_document_id",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_build_bump_document",
+      "target": "function:pipeline/runner.py:_resolve_document_id",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_once",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_once",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_once",
+      "target": "function:pipeline/upstream.py:fetch_cases",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_once",
+      "target": "function:pipeline/runner.py:_process_one_case",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/classifier.py:classify",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/classifier.py:record_hash",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/classifier.py:question_hash",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/dedupe.py:decide",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/refiner.py:refine",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/embedder.py:embed_question_content",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/runner.py:_build_insert_document",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:_process_one_case",
+      "target": "function:pipeline/runner.py:_build_bump_document",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_all",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_all",
+      "target": "function:pipeline/upstream.py:fetch_all_kh_codes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_all",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/runner.py:run_all",
+      "target": "function:pipeline/runner.py:run_once",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "file:scheduler.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:api/routes.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:scheduler.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "file:pipeline/runner.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "function:api/routes.py:status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "function:api/routes.py:trigger_one_route",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "function:api/routes.py:status",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:api/routes.py",
+      "target": "function:api/routes.py:trigger_one_route",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:lifespan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:_apply_cli_overrides",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:lifespan",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:_apply_cli_overrides",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app.py",
+      "target": "function:app.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:config.py",
+      "target": "class:config.py:Settings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:config.py",
+      "target": "function:config.py:get_settings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:config.py",
+      "target": "function:config.py:set_settings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:config.py",
+      "target": "function:config.py:_env_float_compat",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:config.py",
+      "target": "class:config.py:Settings",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:config.py",
+      "target": "function:config.py:get_settings",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:config.py",
+      "target": "function:config.py:set_settings",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:_scheduled_tick",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:trigger_kh_code",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:trigger_all",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:build_scheduler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:mark_scheduler_started",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:status_snapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:_scheduled_tick",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:trigger_kh_code",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:trigger_all",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:build_scheduler",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:mark_scheduler_started",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scheduler.py",
+      "target": "function:scheduler.py:status_snapshot",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:api/routes.py:status",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:api/routes.py:status",
+      "target": "function:scheduler.py:status_snapshot",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:api/routes.py:trigger_one_route",
+      "target": "function:scheduler.py:trigger_kh_code",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:lifespan",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:lifespan",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:lifespan",
+      "target": "function:scheduler.py:build_scheduler",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:lifespan",
+      "target": "function:scheduler.py:mark_scheduler_started",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:_apply_cli_overrides",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:_apply_cli_overrides",
+      "target": "function:config.py:set_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:app.py:main",
+      "target": "function:app.py:_apply_cli_overrides",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:config.py:get_settings",
+      "target": "class:config.py:Settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:_scheduled_tick",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:_scheduled_tick",
+      "target": "function:pipeline/runner.py:run_all",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:trigger_kh_code",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:trigger_kh_code",
+      "target": "function:pipeline/runner.py:run_once",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:trigger_all",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:trigger_all",
+      "target": "function:pipeline/runner.py:run_all",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:build_scheduler",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scheduler.py:mark_scheduler_started",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:scheduler.py",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-input.json",
+      "target": "config:.understand-anything/tmp/ua-scan-files.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "target": "config:.understand-anything/tmp/ua-import-map-input.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-scan-files.json",
+      "target": "file:app.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-scan-files.json",
+      "target": "file:pipeline/runner.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-scan-files.json",
+      "target": "file:config.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "target": "file:app.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "target": "file:pipeline/runner.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "target": "file:config.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-output.json",
+      "target": "file:scheduler.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:.understand-anything/tmp/ua-import-map-input.json",
+      "target": "file:pipeline/runner.py",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:app.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:config.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:scheduler.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:api/routes.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/upstream.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/classifier.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/prompts.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/refiner.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/dedupe.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:pipeline/runner.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:requirements.txt",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "config:pyproject.toml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:pyproject.toml",
+      "target": "document:README.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:requirements.txt",
+      "target": "file:app.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:requirements.txt",
+      "target": "file:scheduler.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:requirements.txt",
+      "target": "file:pipeline/upstream.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:requirements.txt",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:requirements.txt",
+      "target": "document:README.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "file:config.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "class:pipeline/dedupe.py:Decision",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "function:pipeline/dedupe.py:_collect_tombstone_victims",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "function:pipeline/dedupe.py:decide",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:ExistingDoc",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "class:scripts/refresh_case_refined.py:ExportRow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:fetch_documents_for_export",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_export",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_refine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_upload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:build_parser",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:async_main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "class:scripts/stats_case_polarity.py:CollectionPolarityStats",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:collect_stats",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:render_markdown",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:run",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/test_prompts.py",
+      "target": "function:scripts/test_prompts.py:build_report",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:scripts/test_prompts.py",
+      "target": "function:scripts/test_prompts.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:tests/test_runner_mock.py",
+      "target": "class:tests/test_runner_mock.py:FakeLanceClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "class:pipeline/dedupe.py:Decision",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "function:pipeline/dedupe.py:_collect_tombstone_victims",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "function:pipeline/dedupe.py:decide",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:ExistingDoc",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "class:scripts/refresh_case_refined.py:ExportRow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:fetch_documents_for_export",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_export",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_refine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:cmd_upload",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:build_parser",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:async_main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "function:scripts/refresh_case_refined.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "class:scripts/stats_case_polarity.py:CollectionPolarityStats",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:collect_stats",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:render_markdown",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:run",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "function:scripts/stats_case_polarity.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/test_prompts.py",
+      "target": "function:scripts/test_prompts.py:build_report",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/test_prompts.py",
+      "target": "function:scripts/test_prompts.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/dedupe.py:decide",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/dedupe.py:decide",
+      "target": "class:pipeline/dedupe.py:Decision",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:pipeline/dedupe.py:_collect_tombstone_victims",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/refresh_case_refined.py:cmd_export",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/refresh_case_refined.py:cmd_upload",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/refresh_case_refined.py:async_main",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/stats_case_polarity.py:run",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/stats_case_polarity.py:run",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/test_prompts.py:main",
+      "target": "function:config.py:get_settings",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:tests/test_runner_mock.py:FakeLanceClient",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/test_runner_mock.py",
+      "target": "function:pipeline/runner.py:run_once",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/test_runner_mock.py",
+      "target": "function:pipeline/runner.py:run_all",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/test_dedupe.py",
+      "target": "function:pipeline/dedupe.py:decide",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/test_lancedb_client.py",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "class:pipeline/lancedb_client.py:LanceDBV2Client",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "class:pipeline/lancedb_client.py:ExistingIndex",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:scripts/refresh_case_refined.py",
+      "target": "file:data/case_refined_refresh.xlsx",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:scripts/test_prompts.py",
+      "target": "document:scripts/prompts_test_results.md",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:scripts/stats_case_polarity.py",
+      "target": "document:scripts/case_polarity_stats.md",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:pipeline/dedupe.py",
+      "target": "file:tests/test_dedupe.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:pipeline/lancedb_client.py",
+      "target": "file:tests/test_lancedb_client.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:pipeline/runner.py",
+      "target": "file:tests/test_runner_mock.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:app.py",
+      "target": "file:tests/test_app_cli.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:pipeline/classifier.py",
+      "target": "file:tests/test_classifier.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:pipeline/upstream.py",
+      "target": "file:tests/test_upstream.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/intermediate/scan-result.json",
+      "target": "file:__init__.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:docs/lancedb_v2_api.md",
+      "target": "file:pipeline/lancedb_client.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/lancedb_v2_api.md",
+      "target": "file:scripts/refresh_case_refined.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:scripts/case_polarity_stats.md",
+      "target": "file:scripts/stats_case_polarity.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:scripts/prompts_test_results.md",
+      "target": "file:scripts/test_prompts.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:data/case_refined_refresh.xlsx",
+      "target": "file:scripts/refresh_case_refined.py",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:vendor/llm_client.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:vendor/utils_helpers.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:application",
+      "name": "Application Layer",
+      "description": "FastAPI application bootstrap, uvicorn entry point, APScheduler background jobs, and root package marker that wires LanceDB and periodic pipeline execution.",
+      "nodeIds": [
+        "file:app.py",
+        "file:scheduler.py",
+        "file:__init__.py"
+      ]
+    },
+    {
+      "id": "layer:api",
+      "name": "API Layer",
+      "description": "FastAPI route handlers exposing health checks, scheduler status snapshots, and manual triggers to run full or single-khCode refinement pipelines.",
+      "nodeIds": [
+        "file:api/routes.py",
+        "file:api/__init__.py"
+      ]
+    },
+    {
+      "id": "layer:pipeline",
+      "name": "Pipeline Layer",
+      "description": "Core offline refinement workflow orchestrating upstream case fetch, polarity classification, dedupe decisions, LLM refine, embedding, and LanceDB v2 upsert/tombstone.",
+      "nodeIds": [
+        "file:pipeline/classifier.py",
+        "file:pipeline/embedder.py",
+        "file:pipeline/prompts.py",
+        "file:pipeline/refiner.py",
+        "file:pipeline/runner.py",
+        "file:pipeline/upstream.py",
+        "file:pipeline/__init__.py",
+        "file:pipeline/dedupe.py",
+        "file:pipeline/lancedb_client.py"
+      ]
+    },
+    {
+      "id": "layer:utility",
+      "name": "Utility Layer",
+      "description": "Vendored LLM chat client and retry helper copied from page-know-how, providing shared external-service integration without main-repo dependencies.",
+      "nodeIds": [
+        "file:vendor/llm_client.py",
+        "file:vendor/utils_helpers.py"
+      ]
+    },
+    {
+      "id": "layer:config",
+      "name": "Configuration",
+      "description": "Runtime Settings dataclass, pytest project config, dependency manifest, scanner artifacts, and Understand-Anything analysis metadata for the service.",
+      "nodeIds": [
+        "file:config.py",
+        "config:pyproject.toml",
+        "document:requirements.txt",
+        "config:.understand-anything/tmp/ua-import-map-input.json",
+        "config:.understand-anything/tmp/ua-import-map-output.json",
+        "config:.understand-anything/tmp/ua-scan-files.json",
+        "file:.understand-anything/.understandignore",
+        "config:.understand-anything/intermediate/scan-result.json",
+        "file:.DS_Store"
+      ]
+    },
+    {
+      "id": "layer:scripts",
+      "name": "CLI Scripts",
+      "description": "Standalone operational scripts for XLSX-based case export/refine/upload refresh, LanceDB polarity statistics, and manual LLM prompt validation.",
+      "nodeIds": [
+        "file:scripts/refresh_case_refined.py",
+        "file:scripts/stats_case_polarity.py",
+        "file:scripts/test_prompts.py"
+      ]
+    },
+    {
+      "id": "layer:data",
+      "name": "Data Layer",
+      "description": "Intermediate Excel workbook storing exported and LLM-refined case rows used as interchange format between export, refine, and upload CLI stages.",
+      "nodeIds": [
+        "file:data/case_refined_refresh.xlsx"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "Documentation",
+      "description": "Project README, LanceDB v2 API reference, and generated markdown reports from polarity stats and prompt smoke-test runs.",
+      "nodeIds": [
+        "document:README.md",
+        "document:docs/lancedb_v2_api.md",
+        "document:scripts/case_polarity_stats.md",
+        "document:scripts/prompts_test_results.md"
+      ]
+    },
+    {
+      "id": "layer:test",
+      "name": "Test Layer",
+      "description": "Pytest suite covering app CLI overrides, classifier hashing, dedupe decisions, LanceDB HTTP retries, upstream clients, and mocked pipeline runner integration.",
+      "nodeIds": [
+        "file:tests/__init__.py",
+        "file:tests/conftest.py",
+        "file:tests/test_app_cli.py",
+        "file:tests/test_classifier.py",
+        "file:tests/test_dedupe.py",
+        "file:tests/test_lancedb_client.py",
+        "file:tests/test_runner_mock.py",
+        "file:tests/test_upstream.py"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview",
+      "description": "Start with README.md to understand what Case Refinery does: a decoupled offline service that periodically fetches khCodes and case corpus data from upstream, refines positive and negative samples via LLM, and writes results to LanceDB v2 collections for the page-know-how inference service. The README maps the end-to-end data flow (scheduler tick → upstream fetch → dedupe → refine → LanceDB write), documents the HTTP API, and explains how this repo relates to the main monorepo through vendored utilities rather than shared imports.",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Application Entry Point",
+      "description": "app.py is where the service comes alive. It creates the FastAPI application with a lifespan hook that wires the LanceDB client and APScheduler, mounts the API routes, applies CLI overrides to configuration, and launches uvicorn. Reading this file first gives you a runtime map of every major subsystem the service depends on at startup.",
+      "nodeIds": [
+        "file:app.py"
+      ],
+      "languageLesson": "FastAPI lifespan hooks are async context managers that run setup before the server accepts requests and teardown on shutdown — ideal for initializing shared clients like LanceDB and the scheduler."
+    },
+    {
+      "order": 3,
+      "title": "Central Configuration",
+      "description": "config.py is the most depended-upon module in the codebase, exposing a Settings dataclass and singleton get_settings()/set_settings() accessors. Every pipeline stage, the scheduler, API routes, and LanceDB client read upstream URLs, LLM credentials, embedding endpoints, LanceDB base URL, and schedule intervals from environment variables here. requirements.txt complements this step by listing the pinned Python packages (FastAPI, APScheduler, httpx, LanceDB clients, pytest) needed to run the service.",
+      "nodeIds": [
+        "file:config.py",
+        "document:requirements.txt"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "HTTP API Routes",
+      "description": "Building on the FastAPI app from Step 2, api/routes.py exposes the operational surface of the service. Handlers implement GET /healthz and GET /status (returning scheduler state), plus POST /trigger and POST /trigger/{kh_code} for on-demand full or per-khCode pipeline runs. These routes are the bridge between external operators and the scheduler triggers you will explore next.",
+      "nodeIds": [
+        "file:api/routes.py"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Periodic Scheduler",
+      "description": "scheduler.py connects the HTTP triggers and the background tick loop to the pipeline runner. APScheduler fires _scheduled_tick on a configurable interval, calling run_all() to process every khCode, while trigger_all() and trigger_kh_code() expose the same paths for manual invocation from the API routes. status_snapshot() feeds the /status endpoint so operators can see whether the scheduler is running and when the next tick is due.",
+      "nodeIds": [
+        "file:scheduler.py"
+      ],
+      "languageLesson": "APScheduler runs jobs in-process alongside FastAPI. The scheduler's interval and timezone come from Settings, letting operators tune batch frequency without code changes."
+    },
+    {
+      "order": 6,
+      "title": "Pipeline Orchestration",
+      "description": "pipeline/runner.py is the heart of the ingestion workflow, orchestrating upstream fetch, per-case processing, embedding, LanceDB upsert, and tombstoning of superseded question versions. It calls upstream.py to list all khCodes via fetch_all_kh_codes() and pull normalized five-field case records per khCode via fetch_cases(). Together these two modules implement the fetch half of the README data-flow diagram before any LLM work begins.",
+      "nodeIds": [
+        "file:pipeline/runner.py",
+        "file:pipeline/upstream.py"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Classification & Deduplication",
+      "description": "Once cases arrive from upstream, classifier.py determines polarity (positive when the expert approved the answer, negative when they revised it) and computes SHA-256 record and question hashes for versioning. dedupe.py then compares those hashes against the LanceDB ExistingIndex to decide whether to refine, skip, overwrite, or tombstone older question versions — implementing the decision table documented in the README.",
+      "nodeIds": [
+        "file:pipeline/classifier.py",
+        "file:pipeline/dedupe.py"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "LLM Refinement & Embedding",
+      "description": "For cases that pass dedupe with a refine action, prompts.py renders polarity-specific system and user templates, and refiner.py invokes the LLM to produce structured Markdown knowledge while stripping thinking-block artifacts and falling back to raw content on failure. embedder.py wraps the synchronous embedding client in asyncio.to_thread so the runner can generate question vectors without blocking the event loop before writing to LanceDB.",
+      "nodeIds": [
+        "file:pipeline/prompts.py",
+        "file:pipeline/refiner.py",
+        "file:pipeline/embedder.py"
+      ],
+      "languageLesson": "asyncio.to_thread offloads blocking I/O (like embedding API calls) to a thread pool, letting async pipeline code stay non-blocking without rewriting synchronous vendor clients."
+    },
+    {
+      "order": 9,
+      "title": "LanceDB v2 Client",
+      "description": "pipeline/lancedb_client.py is the write path for refined cases: an async HTTP client with retry logic that lists existing documents, upserts new or updated records into per-khCode collections (case_{khCode}), and tombstones superseded versions. docs/lancedb_v2_api.md documents the upstream Retrieval Service v2 contract — collections, documents, upsert, tombstone, and search endpoints — that this client implements against.",
+      "nodeIds": [
+        "file:pipeline/lancedb_client.py",
+        "document:docs/lancedb_v2_api.md"
+      ]
+    },
+    {
+      "order": 10,
+      "title": "Vendored Shared Utilities",
+      "description": "The vendor/ directory holds utilities copied from the page-know-how monorepo and trimmed for standalone use, honoring the README's decoupling principle. llm_client.py provides an OpenAI-compatible chat client with retry behavior for the refiner, while utils_helpers.py supplies the @retry decorator used across HTTP clients. Understanding these copies explains why the service has no imports from the main repository.",
+      "nodeIds": [
+        "file:vendor/llm_client.py",
+        "file:vendor/utils_helpers.py"
+      ],
+      "languageLesson": "Python decorators like @retry wrap a function to re-execute it on failure with configurable attempts and sleep intervals — a lightweight resilience pattern without external retry libraries."
+    },
+    {
+      "order": 11,
+      "title": "Operational Scripts",
+      "description": "Beyond the long-running service, scripts/ provides CLI tools for ad-hoc operations. refresh_case_refined.py orchestrates export, LLM refine, and upload stages for case_refined collections via an XLSX interchange file. stats_case_polarity.py scans LanceDB collections and renders positive/negative counts to markdown, and test_prompts.py runs manual prompt smoke tests — useful for validating prompt changes before deploying.",
+      "nodeIds": [
+        "file:scripts/refresh_case_refined.py",
+        "file:scripts/stats_case_polarity.py",
+        "file:scripts/test_prompts.py"
+      ]
+    },
+    {
+      "order": 12,
+      "title": "Test Suite",
+      "description": "The tests/ directory validates each layer of the architecture: test_classifier.py and test_dedupe.py cover hash and decision logic, test_lancedb_client.py verifies HTTP retry behavior, test_upstream.py checks API fetching, test_app_cli.py validates CLI config overrides, and test_runner_mock.py exercises the full pipeline with mocked dependencies. conftest.py adds the project root to sys.path, and pyproject.toml configures pytest with asyncio auto mode for async test support.",
+      "nodeIds": [
+        "file:tests/test_runner_mock.py",
+        "file:tests/test_dedupe.py",
+        "file:tests/test_classifier.py",
+        "file:tests/conftest.py",
+        "config:pyproject.toml"
+      ]
+    }
+  ]
+}
