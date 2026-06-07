@@ -8,9 +8,11 @@
 
     # 2) 本地重跑 refine，结果写入 xlsx（refined_knowledge_new 等列）
     python scripts/refresh_case_refined.py refine -i data/case_refined_refresh.xlsx
+    # 中断后再次执行同一命令即可续跑（自动跳过 refine_ok=true 的行，含 failed 重试）
 
     # 3) 人工审阅 xlsx 后，回写 LanceDB（仅 merge metadata + refined_knowledge）
     python scripts/refresh_case_refined.py upload -i data/case_refined_refresh.xlsx --confirm
+    # 中断后再次执行同一命令即可续传（自动跳过 upload_ok=true 的行）
 
 默认筛选（6.2 之前入库的数据）：``ingest_ts`` 严格早于 2026-06-02 00:00
 （Asia/Shanghai）、``refine_status=refined``、未 tombstone。
@@ -446,11 +448,77 @@ async def _refine_one_row_indexed(
     return idx, updated
 
 
+def _refine_row_done(row: dict[str, Any]) -> bool:
+    return str(row.get("refine_ok")).strip().lower() == "true"
+
+
+def _refine_row_pending(
+    row: dict[str, Any],
+    *,
+    force: bool,
+    skip_failed: bool,
+) -> bool:
+    """续跑待处理：refine_ok 为空或 false；已成功 (true) 跳过。"""
+    if force:
+        return True
+    status = str(row.get("refine_ok")).strip().lower()
+    if status == "true":
+        return False
+    if status == "false" and skip_failed:
+        return False
+    return True
+
+
 def _flush_logs() -> None:
     for handler in logging.root.handlers:
         handler.flush()
     sys.stdout.flush()
     sys.stderr.flush()
+
+
+class _NullProgressBar:
+    """tqdm 不可用或禁用时的占位。"""
+
+    enabled = False
+
+    def update(self, n: int = 1) -> None:
+        pass
+
+    def set_postfix(self, **kwargs: Any) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+def _make_progress_bar(
+    total: int,
+    desc: str,
+    *,
+    disable: bool = False,
+) -> Any:
+    if disable or total <= 0:
+        return _NullProgressBar()
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        logger.warning("未安装 tqdm，进度条已禁用；请 pip install tqdm")
+        return _NullProgressBar()
+
+    bar = tqdm(
+        total=total,
+        desc=desc,
+        unit="条",
+        file=sys.stderr,
+        dynamic_ncols=True,
+        mininterval=0.2,
+        bar_format=(
+            "{l_bar}{bar}| {n_fmt}/{total_fmt} "
+            "[{elapsed}<{remaining}, {rate_fmt}] {postfix}"
+        ),
+    )
+    bar.enabled = True  # type: ignore[attr-defined]
+    return bar
 
 
 async def cmd_refine(args: argparse.Namespace, settings: Settings) -> int:
@@ -472,13 +540,47 @@ async def cmd_refine(args: argparse.Namespace, settings: Settings) -> int:
     total = len(rows)
     out_path = os.path.abspath(args.output or path)
     working = [dict(r) for r in rows]
+    pending_indices = [
+        i
+        for i, row in enumerate(working)
+        if _refine_row_pending(
+            row, force=args.force, skip_failed=args.skip_failed
+        )
+    ]
+    skipped = total - len(pending_indices)
+    pending_total = len(pending_indices)
+    pending_failed = sum(
+        1
+        for i in pending_indices
+        if str(working[i].get("refine_ok")).strip().lower() == "false"
+    )
+    pending_new = pending_total - pending_failed
+
+    if pending_total == 0:
+        ok_all = sum(1 for r in working if _refine_row_done(r))
+        fail_all = sum(
+            1 for r in working if str(r.get("refine_ok")).strip().lower() == "false"
+        )
+        logger.info(
+            "[refine] 无需处理：共 %d 条均已 refine（ok=%d fail=%d skipped=%d）",
+            total, ok_all, fail_all, skipped,
+        )
+        _flush_logs()
+        print(f"refine 无需续跑: total={total} ok={ok_all} fail={fail_all}", flush=True)
+        return 0 if fail_all == 0 or not args.strict else 1
+
     sem = asyncio.Semaphore(max(1, args.concurrency))
     progress_every = max(1, args.progress_every)
     checkpoint_every = max(0, args.checkpoint_every)
 
     logger.info(
-        "[refine] 开始处理 %d 条，并发=%d，进度间隔=%d，checkpoint=%s",
+        "[refine] 共 %d 条，续跑待处理 %d 条（未跑 %d + failed 重试 %d，跳过已完成 %d），"
+        "并发=%d，进度间隔=%d，checkpoint=%s",
         total,
+        pending_total,
+        pending_new,
+        pending_failed,
+        skipped,
         args.concurrency,
         progress_every,
         checkpoint_every if checkpoint_every else "关闭",
@@ -487,45 +589,66 @@ async def cmd_refine(args: argparse.Namespace, settings: Settings) -> int:
 
     tasks = [
         asyncio.create_task(
-            _refine_one_row_indexed(i, row, settings=settings, sem=sem)
+            _refine_one_row_indexed(i, working[i], settings=settings, sem=sem)
         )
-        for i, row in enumerate(rows)
+        for i in pending_indices
     ]
-    ok_count = 0
-    fail_count = 0
+    ok_new = 0
+    fail_new = 0
     done = 0
+    use_bar = not args.no_progress_bar
+    pbar = _make_progress_bar(pending_total, "refine", disable=not use_bar)
 
-    for coro in asyncio.as_completed(tasks):
-        idx, row = await coro
-        working[idx] = row
-        done += 1
-        if str(row.get("refine_ok")).lower() == "true":
-            ok_count += 1
-        else:
-            fail_count += 1
+    try:
+        for coro in asyncio.as_completed(tasks):
+            idx, row = await coro
+            working[idx] = row
+            done += 1
+            if str(row.get("refine_ok")).lower() == "true":
+                ok_new += 1
+            else:
+                fail_new += 1
 
-        if done % progress_every == 0 or done == total:
-            logger.info(
-                "[refine] 进度 %d/%d ok=%d fail=%d",
-                done, total, ok_count, fail_count,
-            )
-            _flush_logs()
+            pbar.update(1)
+            pbar.set_postfix(ok=ok_new, fail=fail_new, refresh=False)
 
-        if checkpoint_every and (done % checkpoint_every == 0 or done == total):
-            write_xlsx(out_path, working)
-            logger.info("[refine] checkpoint 已写入 %s（%d/%d）", out_path, done, total)
-            _flush_logs()
+            if not use_bar and (
+                done % progress_every == 0 or done == pending_total
+            ):
+                logger.info(
+                    "[refine] 进度 %d/%d（本轮 ok=%d fail=%d；累计跳过 %d）",
+                    done, pending_total, ok_new, fail_new, skipped,
+                )
+                _flush_logs()
+
+            if checkpoint_every and (done % checkpoint_every == 0 or done == pending_total):
+                write_xlsx(out_path, working)
+                logger.info(
+                    "[refine] checkpoint 已写入 %s（本轮 %d/%d）",
+                    out_path, done, pending_total,
+                )
+                _flush_logs()
+    finally:
+        pbar.close()
 
     if not checkpoint_every:
         write_xlsx(out_path, working)
 
-    logger.info("[refine] 完成 total=%d ok=%d fail=%d", total, ok_count, fail_count)
+    ok_all = sum(1 for r in working if _refine_row_done(r))
+    fail_all = sum(
+        1 for r in working if str(r.get("refine_ok")).strip().lower() == "false"
+    )
+    logger.info(
+        "[refine] 完成 total=%d 本轮=%d ok=%d fail=%d（累计 ok=%d fail=%d 跳过=%d）",
+        total, pending_total, ok_new, fail_new, ok_all, fail_all, skipped,
+    )
     _flush_logs()
     print(
-        f"refine 完成: total={total} ok={ok_count} fail={fail_count} -> {out_path}",
+        f"refine 完成: total={total} 本轮={pending_total} "
+        f"累计 ok={ok_all} fail={fail_all} -> {out_path}",
         flush=True,
     )
-    return 0 if fail_count == 0 or not args.strict else 1
+    return 0 if fail_all == 0 or not args.strict else 1
 
 
 def _build_upload_merge_document(row: dict[str, Any]) -> dict:
@@ -556,6 +679,123 @@ def _build_upload_merge_document(row: dict[str, Any]) -> dict:
     }
 
 
+def _upload_row_done(row: dict[str, Any]) -> bool:
+    return str(row.get("upload_ok")).strip().lower() == "true"
+
+
+def _upload_row_eligible(row: dict[str, Any]) -> bool:
+    return (
+        str(row.get("refine_ok")).strip().lower() == "true"
+        and bool(str(row.get("refined_knowledge_new") or "").strip())
+    )
+
+
+def _upload_row_pending(
+    row: dict[str, Any],
+    *,
+    force: bool,
+    skip_failed: bool,
+) -> bool:
+    if not _upload_row_eligible(row):
+        return False
+    if force:
+        return True
+    status = str(row.get("upload_ok")).strip().lower()
+    if status == "true":
+        return False
+    if status == "false" and skip_failed:
+        return False
+    return True
+
+
+def _write_upload_status_to_rows(
+    all_rows: list[dict[str, Any]],
+    updated: dict[tuple[str, str], dict[str, Any]],
+) -> None:
+    for row in all_rows:
+        key = (str(row.get("kh_code")), str(row.get("document_id")))
+        if key in updated:
+            src = updated[key]
+            row["upload_ok"] = src.get("upload_ok", "")
+            row["upload_error"] = src.get("upload_error", "")
+
+
+def _last_upload_ok_from_log(log_path: str) -> int:
+    """从 upload 日志解析最后一次进度报告中的 ok 数。"""
+    import re
+
+    pat = re.compile(r"\[upload\] 进度 \d+/\d+ ok=(\d+) fail=\d+")
+    last_ok = 0
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            for line in f:
+                m = pat.search(line)
+                if m:
+                    last_ok = int(m.group(1))
+    except OSError:
+        return 0
+    return last_ok
+
+
+def _mark_uploaded_prefix(
+    working: list[dict[str, Any]],
+    count: int,
+) -> int:
+    """按 xlsx 顺序将前 count 条 eligible 行标记为 upload_ok=true。"""
+    if count <= 0:
+        return 0
+    marked = 0
+    for row in working:
+        if not _upload_row_eligible(row):
+            continue
+        if _upload_row_done(row):
+            continue
+        if marked >= count:
+            break
+        row["upload_ok"] = "true"
+        row["upload_error"] = ""
+        marked += 1
+    return marked
+
+
+async def _upload_one_row(
+    row: dict[str, Any],
+    *,
+    cli: LanceDBV2Client,
+    sem: asyncio.Semaphore,
+) -> bool:
+    """上传单条，返回是否成功。"""
+    async with sem:
+        kh_code = str(row.get("kh_code") or "")
+        doc = _build_upload_merge_document(row)
+        try:
+            await cli.upsert_one(kh_code, doc, mode="merge_by_chunk_id")
+            row["upload_ok"] = "true"
+            row["upload_error"] = ""
+            return True
+        except LanceDBError as e:
+            row["upload_ok"] = "false"
+            row["upload_error"] = str(e)
+            logger.warning(
+                "[upload] 失败 kh=%s doc_id=%s: %s",
+                kh_code,
+                row.get("document_id"),
+                e,
+            )
+            return False
+
+
+async def _upload_one_indexed(
+    idx: int,
+    row: dict[str, Any],
+    *,
+    cli: LanceDBV2Client,
+    sem: asyncio.Semaphore,
+) -> tuple[int, bool]:
+    ok = await _upload_one_row(row, cli=cli, sem=sem)
+    return idx, ok
+
+
 async def cmd_upload(args: argparse.Namespace, settings: Settings) -> int:
     if not args.confirm:
         print(
@@ -569,74 +809,180 @@ async def cmd_upload(args: argparse.Namespace, settings: Settings) -> int:
         return 1
 
     rows = read_xlsx(path)
-    candidates = [
+    working = [dict(r) for r in rows]
+
+    if args.recover_from_log:
+        log_path = os.path.abspath(args.recover_from_log)
+        recovered = _last_upload_ok_from_log(log_path)
+        if recovered <= 0:
+            logger.warning("[upload] 日志 %s 中未解析到进度，跳过 recover", log_path)
+        else:
+            marked = _mark_uploaded_prefix(working, recovered)
+            write_xlsx(path, working)
+            logger.info(
+                "[upload] 已从日志恢复：标记 %d 条 upload_ok=true（日志 ok=%d）",
+                marked,
+                recovered,
+            )
+            _flush_logs()
+            if args.recover_only:
+                print(f"recover 完成: 标记 {marked} 条 -> {path}", flush=True)
+                return 0
+
+    pending = [
         r
-        for r in rows
-        if str(r.get("refine_ok")).lower() == "true"
-        and str(r.get("refined_knowledge_new") or "").strip()
+        for r in working
+        if _upload_row_pending(r, force=args.force, skip_failed=args.skip_failed)
     ]
     if args.limit > 0:
-        candidates = candidates[: args.limit]
+        pending = pending[: args.limit]
 
-    if not candidates:
-        logger.warning("没有 refine_ok=true 且 refined_knowledge_new 非空的行可上传")
-        return 1
+    eligible_total = sum(1 for r in working if _upload_row_eligible(r))
+    already_done = sum(1 for r in working if _upload_row_done(r))
+    pending_failed = sum(
+        1
+        for r in pending
+        if str(r.get("upload_ok")).strip().lower() == "false"
+    )
+    pending_new = len(pending) - pending_failed
 
-    print(f"待上传 {len(candidates)} 条（dry_run={not args.confirm}）")
+    if not pending:
+        logger.info(
+            "[upload] 无需续传：可上传 %d 条，已完成 %d 条",
+            eligible_total,
+            already_done,
+        )
+        _flush_logs()
+        print(
+            f"upload 无需续传: eligible={eligible_total} done={already_done}",
+            flush=True,
+        )
+        return 0
+
+    print(
+        f"待上传 {len(pending)} 条（未传 {pending_new} + failed 重试 {pending_failed}，"
+        f"已完成 {already_done}，dry_run={not args.confirm}）"
+    )
     if not args.confirm:
-        for r in candidates[:5]:
+        for r in pending[:5]:
             print(
                 f"  - kh={r.get('kh_code')} doc_id={r.get('document_id')} "
                 f"len_new={len(str(r.get('refined_knowledge_new') or ''))}"
             )
-        if len(candidates) > 5:
-            print(f"  ... 另有 {len(candidates) - 5} 条")
+        if len(pending) > 5:
+            print(f"  ... 另有 {len(pending) - 5} 条")
         return 0
 
     cli = LanceDBV2Client(settings=settings)
-    ok = 0
-    fail = 0
+    ok_new = 0
+    fail_new = 0
+    checkpoint_every = max(0, args.checkpoint_every)
+    progress_every = max(1, args.progress_every)
+    concurrency = max(1, args.concurrency)
+    updated_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    pending_total = len(pending)
+
+    logger.info(
+        "[upload] 开始续传 pending=%d（未传 %d + failed 重试 %d），已完成 %d，"
+        "并发=%d，checkpoint=%s",
+        pending_total,
+        pending_new,
+        pending_failed,
+        already_done,
+        concurrency,
+        checkpoint_every if checkpoint_every else "关闭",
+    )
+    _flush_logs()
+
+    sem = asyncio.Semaphore(concurrency)
+    done = 0
+    use_bar = not args.no_progress_bar
+    pbar = _make_progress_bar(pending_total, "upload", disable=not use_bar)
+
     try:
-        for i, row in enumerate(candidates, 1):
-            kh_code = str(row.get("kh_code") or "")
-            doc = _build_upload_merge_document(row)
-            try:
-                await cli.upsert_one(kh_code, doc, mode="merge_by_chunk_id")
-                row["upload_ok"] = "true"
-                row["upload_error"] = ""
-                ok += 1
-            except LanceDBError as e:
-                row["upload_ok"] = "false"
-                row["upload_error"] = str(e)
-                fail += 1
-                logger.warning(
-                    "[upload] 失败 kh=%s doc_id=%s: %s",
-                    kh_code,
-                    row.get("document_id"),
-                    e,
+        tasks = [
+            asyncio.create_task(
+                _upload_one_indexed(i, row, cli=cli, sem=sem)
+            )
+            for i, row in enumerate(pending)
+        ]
+        for coro in asyncio.as_completed(tasks):
+            idx, success = await coro
+            row = pending[idx]
+            key = (str(row.get("kh_code")), str(row.get("document_id")))
+            updated_by_key[key] = row
+            done += 1
+            if success:
+                ok_new += 1
+            else:
+                fail_new += 1
+
+            done_all = already_done + ok_new
+            pbar.update(1)
+            pbar.set_postfix(
+                ok=ok_new,
+                fail=fail_new,
+                total_done=done_all,
+                refresh=False,
+            )
+
+            if not use_bar and (
+                done % progress_every == 0 or done == pending_total
+            ):
+                logger.info(
+                    "[upload] 进度 %d/%d（本轮 ok=%d fail=%d；累计完成 %d/%d）",
+                    done,
+                    pending_total,
+                    ok_new,
+                    fail_new,
+                    done_all,
+                    eligible_total,
                 )
-            if i % max(1, args.progress_every) == 0 or i == len(candidates):
-                logger.info("[upload] 进度 %d/%d ok=%d fail=%d", i, len(candidates), ok, fail)
-            # 节流，避免 LanceDB 突发
-            if args.upload_delay_s > 0:
-                await asyncio.sleep(args.upload_delay_s)
+                _flush_logs()
+
+            if checkpoint_every and (
+                done % checkpoint_every == 0 or done == pending_total
+            ):
+                _write_upload_status_to_rows(working, updated_by_key)
+                write_xlsx(path, working)
+                logger.info(
+                    "[upload] checkpoint 已写入 %s（本轮 %d/%d）",
+                    path,
+                    done,
+                    pending_total,
+                )
+                _flush_logs()
     finally:
+        pbar.close()
         await cli.aclose()
 
-    # 把 upload 状态写回完整 xlsx
-    by_key = {
-        (str(r.get("kh_code")), str(r.get("document_id"))): r for r in candidates
-    }
-    for row in rows:
-        key = (str(row.get("kh_code")), str(row.get("document_id")))
-        if key in by_key:
-            src = by_key[key]
-            row["upload_ok"] = src.get("upload_ok", "")
-            row["upload_error"] = src.get("upload_error", "")
+    _write_upload_status_to_rows(working, updated_by_key)
+    if not checkpoint_every:
+        write_xlsx(path, working)
 
-    write_xlsx(path, rows)
-    print(f"upload 完成: ok={ok} fail={fail}，状态已写回 {path}")
-    return 0 if fail == 0 else 1
+    done_all = sum(1 for r in working if _upload_row_done(r))
+    fail_all = sum(
+        1
+        for r in working
+        if _upload_row_eligible(r)
+        and str(r.get("upload_ok")).strip().lower() == "false"
+    )
+    logger.info(
+        "[upload] 完成 eligible=%d 本轮=%d ok=%d fail=%d（累计完成=%d fail=%d）",
+        eligible_total,
+        len(pending),
+        ok_new,
+        fail_new,
+        done_all,
+        fail_all,
+    )
+    _flush_logs()
+    print(
+        f"upload 完成: eligible={eligible_total} 本轮={len(pending)} "
+        f"累计完成={done_all} fail={fail_all} -> {path}",
+        flush=True,
+    )
+    return 0 if fail_all == 0 else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -704,9 +1050,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="每处理多少条写一次 xlsx checkpoint（0=仅结束时写入）",
     )
     p_refine.add_argument(
+        "--force",
+        action="store_true",
+        help="忽略已有 refine 结果，全部重跑",
+    )
+    p_refine.add_argument(
+        "--skip-failed",
+        action="store_true",
+        help="续跑时跳过 refine_ok=false 的行（默认会重试 failed）",
+    )
+    p_refine.add_argument(
         "--strict",
         action="store_true",
         help="若存在 refine 失败则 exit 1",
+    )
+    p_refine.add_argument(
+        "--no-progress-bar",
+        action="store_true",
+        help="禁用 tqdm 进度条，改回日志输出进度",
     )
 
     p_upload = sub.add_parser("upload", help="将审阅后的 refined_knowledge 写回 LanceDB")
@@ -717,12 +1078,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="确认写入 LanceDB（无此参数仅 dry-run）",
     )
     p_upload.add_argument("--limit", type=int, default=0)
+    p_upload.add_argument(
+        "--concurrency",
+        type=int,
+        default=20,
+        help="并发 upload 数（默认 20）",
+    )
     p_upload.add_argument("--progress-every", type=int, default=20)
+    p_upload.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=200,
+        help="每上传多少条写一次 xlsx checkpoint（0=仅结束时写入）",
+    )
+    p_upload.add_argument(
+        "--force",
+        action="store_true",
+        help="忽略 upload_ok，全部重新上传",
+    )
+    p_upload.add_argument(
+        "--skip-failed",
+        action="store_true",
+        help="续传时跳过 upload_ok=false 的行（默认会重试 failed）",
+    )
+    p_upload.add_argument(
+        "--recover-from-log",
+        default="",
+        help="从 upload 日志恢复进度，将已上传条数写回 xlsx 的 upload_ok",
+    )
+    p_upload.add_argument(
+        "--recover-only",
+        action="store_true",
+        help="仅执行 recover-from-log 标记，不实际上传",
+    )
+    p_upload.add_argument(
+        "--no-progress-bar",
+        action="store_true",
+        help="禁用 tqdm 进度条，改回日志输出进度",
+    )
     p_upload.add_argument(
         "--upload-delay-s",
         type=float,
-        default=0.05,
-        help="每条 upload 间隔秒数",
+        default=0.0,
+        help="每条 upload 完成后的额外间隔秒数（并发模式下一般保持 0）",
     )
 
     return parser
